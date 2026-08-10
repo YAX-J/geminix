@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- 聚合工程（packaging=pom，仅用于 IDEA 统一管理，不产生构建产物） -->
+    <groupId>com.worklog</groupId>
+    <artifactId>worklog-parent</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+    <name>worklog-parent</name>
+    <description>工作日志台聚合工程：backend(Maven/Spring Boot) + frontend(Vue3)</description>
+
+    <modules>
+        <!-- 后端 Spring Boot 子模块 -->
+        <module>backend</module>
+    </modules>
+</project>

@@ -1,0 +1,296 @@
+/* 全局样式：设计变量、基础 reset、通用组件（按钮/标签/弹窗/Toast） */
+:root {
+  --primary: #4f46e5;
+  --primary-deep: #4338ca;
+  --primary-bg: #eef2ff;
+  --problem: #f59e0b;
+  --problem-bg: #fffbeb;
+  --problem-deep: #b45309;
+  --solution: #10b981;
+  --solution-bg: #ecfdf5;
+  --solution-deep: #047857;
+  --bg: #f5f6fa;
+  --card: #ffffff;
+  --text: #1e293b;
+  --text-2: #64748b;
+  --text-3: #94a3b8;
+  --border: #e4e7ef;
+  --shadow: 0 1px 2px rgba(30, 41, 59, 0.05), 0 4px 16px rgba(30, 41, 59, 0.06);
+  --radius: 14px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d4d8e2;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 按钮 */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: all 0.15s;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+.btn-primary:hover {
+  background: var(--primary-deep);
+  transform: translateY(-1px);
+}
+.btn-problem {
+  background: var(--problem);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+.btn-problem:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+.btn-ghost {
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  background: #fff;
+}
+.btn-ghost:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+/* 标签 */
+.tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+.tag-backend { color: var(--primary-deep); background: var(--primary-bg); }
+.tag-frontend { color: #0e7490; background: #ecfeff; }
+.tag-db { color: #7c3aed; background: #f5f3ff; }
+.tag-ops { color: #b45309; background: #fef3c7; }
+.tag-redis { color: #b91c1c; background: #fef2f2; }
+
+/* 标签 chip */
+.tag-chip {
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  transition: all 0.15s;
+  cursor: pointer;
+  user-select: none;
+  display: inline-block;
+}
+.tag-chip:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.tag-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+/* 动画 */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes flashRing {
+  0% {
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.35);
+  }
+  100% {
+    box-shadow: var(--shadow);
+  }
+}
+.flash {
+  animation: flashRing 1.6s ease both;
+}
+
+/* 弹窗遮罩与卡片（Teleport 使用） */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 100;
+  padding-top: 9vh;
+}
+.modal {
+  width: 540px;
+  max-width: 92vw;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.3);
+  animation: rise 0.28s ease both;
+  overflow: hidden;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 0;
+}
+.modal-head h3 {
+  font-size: 17px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: var(--text-2);
+}
+.modal-close:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+.modal-body {
+  padding: 16px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 22px 22px;
+}
+
+/* 表单 */
+.field label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.field label .req {
+  color: #ef4444;
+}
+.field input[type='text'],
+.field input[type='date'],
+.field textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  background: var(--bg);
+  transition: all 0.15s;
+  resize: vertical;
+  color: var(--text);
+}
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--primary-bg);
+}
+.field textarea {
+  min-height: 64px;
+  line-height: 1.6;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-top: 4px;
+}
+
+/* Toast */
+.toast-host {
+  position: fixed;
+  bottom: 26px;
+  right: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 300;
+}
+.toast {
+  background: #1e293b;
+  color: #fff;
+  font-size: 13px;
+  padding: 11px 18px;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: rise 0.3s ease both;
+}
+.toast .ico {
+  color: #34d399;
+  font-weight: 800;
+}

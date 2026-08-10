@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工作日志台 · WorkLog 布局原型 v2</title>
+<!--
+  ============================================================
+  工作日志台 v2 —— 日报与问题为两个平级独立模块
+  技术栈规划: Vue3 + Pinia + Element Plus + ECharts
+  后端规划:   Java(Spring Boot) + MySQL + Redis
+
+  核心设计：问题可独立记录，不依赖日报；两者通过「关联」可选连接。
+  本文件为纯静态可交互原型，注释中标注对应 Vue 组件名。
+  ============================================================
+-->
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-deep: #4338ca;
+    --primary-bg: #eef2ff;
+    --problem: #f59e0b;
+    --problem-bg: #fffbeb;
+    --problem-deep: #b45309;
+    --solution: #10b981;
+    --solution-bg: #ecfdf5;
+    --solution-deep: #047857;
+    --bg: #f5f6fa;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-2: #64748b;
+    --text-3: #94a3b8;
+    --border: #e4e7ef;
+    --shadow: 0 1px 2px rgba(30, 41, 59, .05), 0 4px 16px rgba(30, 41, 59, .06);
+    --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px; overflow: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; }
+  input, textarea { font-family: inherit; outline: none; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d4d8e2; border-radius: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ===== 顶栏 TopBar.vue ===== */
+  .topbar {
+    height: 60px; flex-shrink: 0; background: var(--card); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px; padding: 0 20px; z-index: 30;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 172px; }
+  .brand-logo {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 16px;
+    box-shadow: 0 4px 10px rgba(79, 70, 229, .35);
+  }
+  .brand-name { font-size: 16px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
+  .brand-name small { display: block; font-size: 11px; font-weight: 400; color: var(--text-3); margin-top: 1px; }
+
+  .search-box {
+    flex: 1; max-width: 480px; margin: 0 auto;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 14px; transition: all .2s;
+  }
+  .search-box:focus-within { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px var(--primary-bg); }
+  .search-box svg { flex-shrink: 0; color: var(--text-3); }
+  .search-box input { flex: 1; border: none; background: none; font-size: 14px; color: var(--text); }
+  .search-box input::placeholder { color: var(--text-3); }
+  .kbd { font-size: 11px; color: var(--text-2); background: #fff; border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; flex-shrink: 0; }
+
+  .topbar-actions { display: flex; align-items: center; gap: 10px; min-width: 300px; justify-content: flex-end; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 10px;
+    padding: 8px 14px; font-size: 13.5px; font-weight: 600; transition: all .15s; white-space: nowrap;
+  }
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(79, 70, 229, .3); }
+  .btn-primary:hover { background: var(--primary-deep); transform: translateY(-1px); }
+  .btn-problem { background: var(--problem); color: #fff; box-shadow: 0 4px 12px rgba(245, 158, 11, .35); }
+  .btn-problem:hover { background: #d97706; transform: translateY(-1px); }
+  .btn-ghost { color: var(--text-2); border: 1px solid var(--border); background: #fff; }
+  .btn-ghost:hover { color: var(--primary); border-color: var(--primary); }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  }
+
+  .main { flex: 1; display: grid; grid-template-columns: 264px 1fr 332px; overflow: hidden; }
+
+  /* ---------- 左栏 SidebarHeatmap.vue ---------- */
+  .panel-left { background: var(--card); border-right: 1px solid var(--border); overflow-y: auto; padding: 18px 16px 24px; }
+  .panel-title { font-size: 12px; font-weight: 700; color: var(--text-2); letter-spacing: 1px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; }
+  .panel-title .link { color: var(--primary); font-weight: 600; cursor: pointer; }
+  .panel-title .link:hover { text-decoration: underline; }
+  .hm-month { font-size: 12px; color: var(--text-3); margin-bottom: 8px; font-weight: 600; }
+  .hm-wrap { display: flex; gap: 4px; }
+  .hm-col { display: flex; flex-direction: column; gap: 4px; }
+  .hm-cell { width: 13px; height: 13px; border-radius: 3px; background: #ebedf2; cursor: pointer; transition: transform .12s; }
+  .hm-cell:hover { transform: scale(1.25); outline: 1px solid var(--primary); }
+  .hm-cell.l1 { background: #c7d2fe; }
+  .hm-cell.l2 { background: #818cf8; }
+  .hm-cell.l3 { background: #4f46e5; }
+  .hm-cell.l4 { background: #3730a3; }
+  .hm-cell.today { outline: 2px solid var(--problem); outline-offset: 1px; }
+  .hm-legend { display: flex; align-items: center; gap: 4px; margin-top: 10px; font-size: 11px; color: var(--text-3); justify-content: flex-end; }
+  .hm-legend .hm-cell { width: 11px; height: 11px; }
+  .divider { height: 1px; background: var(--border); margin: 18px 0; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+  .stat-num { font-size: 22px; font-weight: 800; line-height: 1.1; }
+  .stat-num.primary { color: var(--primary); }
+  .stat-num.green { color: var(--solution); }
+  .stat-num.amber { color: var(--problem); }
+  .stat-label { font-size: 11.5px; color: var(--text-2); margin-top: 3px; }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag-chip {
+    font-size: 12px; padding: 5px 12px; border-radius: 999px;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-2);
+    transition: all .15s; cursor: pointer; user-select: none;
+  }
+  .tag-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .tag-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  /* ---------- 中栏 MainView.vue ---------- */
+  .timeline { overflow-y: auto; padding: 22px 28px 80px; }
+  .timeline-inner { max-width: 800px; margin: 0 auto; }
+
+  .tl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .center-tabs { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 4px; box-shadow: var(--shadow); }
+  .tab-main {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 18px; border-radius: 9px; font-size: 13.5px; font-weight: 700; color: var(--text-2); transition: all .15s;
+  }
+  .tab-main:hover { color: var(--primary); }
+  .tab-main.active { background: var(--primary); color: #fff; box-shadow: 0 4px 12px rgba(79, 70, 229, .3); }
+  .tab-main .cnt { font-size: 11px; background: rgba(15, 23, 42, .12); border-radius: 999px; padding: 1px 7px; }
+  .tab-main.active .cnt { background: rgba(255, 255, 255, .25); }
+  .tl-stat { font-size: 12.5px; color: var(--text-2); }
+  .tl-stat b { color: var(--text); }
+
+  /* 日报视图：吸顶日期 + 卡片 */
+  .day-group { margin-bottom: 26px; }
+  .day-group.flash .report-card { animation: flashRing 1.6s ease both; }
+  @keyframes flashRing {
+    0% { box-shadow: 0 0 0 3px rgba(79, 70, 229, .35); }
+    100% { box-shadow: var(--shadow); }
+  }
+  .day-head {
+    position: sticky; top: -22px; z-index: 5;
+    display: flex; align-items: center; gap: 14px;
+    background: rgba(245, 246, 250, .88); backdrop-filter: blur(8px);
+    padding: 12px 4px; border-radius: 12px; margin-bottom: 12px;
+  }
+  .day-cal {
+    width: 46px; height: 50px; border-radius: 12px; background: var(--card);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .day-cal .d { font-size: 20px; font-weight: 800; line-height: 1; }
+  .day-cal .m { font-size: 10.5px; color: var(--text-2); margin-top: 3px; }
+  .day-head .week { font-size: 15px; font-weight: 700; }
+  .day-head .desc { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+  .today-pill { font-size: 11px; font-weight: 700; color: #fff; background: var(--primary); padding: 3px 9px; border-radius: 999px; margin-left: 8px; }
+  .day-actions { margin-left: auto; }
+
+  .report-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 18px 20px; margin-bottom: 14px;
+    animation: rise .35s ease both; transition: box-shadow .2s, border-color .2s;
+  }
+  .report-card:hover { box-shadow: 0 2px 4px rgba(30,41,59,.06), 0 10px 28px rgba(30,41,59,.10); border-color: #d7dbe7; }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .rc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rc-time { font-size: 11.5px; color: var(--text-3); background: var(--bg); padding: 3px 9px; border-radius: 6px; font-weight: 600; }
+  .rc-head h3 { font-size: 15.5px; font-weight: 700; flex: 1; min-width: 200px; }
+  .tag { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
+  .tag-backend { color: var(--primary-deep); background: var(--primary-bg); }
+  .tag-frontend { color: #0e7490; background: #ecfeff; }
+  .tag-db { color: #7c3aed; background: #f5f3ff; }
+  .tag-ops { color: #b45309; background: #fef3c7; }
+  .tag-redis { color: #b91c1c; background: #fef2f2; }
+  .rc-tasks { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .rc-tasks li { display: flex; gap: 9px; font-size: 13.5px; color: var(--text); line-height: 1.55; }
+  .rc-tasks li::before {
+    content: ""; flex-shrink: 0; width: 15px; height: 15px; margin-top: 3px;
+    border-radius: 5px; background: var(--solution-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/11px no-repeat;
+  }
+  /* 日报卡片底部：可选的关联问题入口（无则整行隐藏） */
+  .rc-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  .rc-link {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+    color: var(--problem-deep); background: var(--problem-bg); border: 1px solid #fde68a;
+    border-radius: 999px; padding: 5px 12px; cursor: pointer; transition: all .15s;
+  }
+  .rc-link:hover { background: var(--problem); color: #fff; border-color: var(--problem); }
+  .rc-foot { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+  .rc-edit { font-size: 12px; color: var(--text-3); cursor: pointer; }
+  .rc-edit:hover { color: var(--primary); }
+
+  /* 问题视图：独立问题卡片流 IssueList.vue */
+  .issue-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; flex-wrap: wrap; }
+  .issue-filter { display: flex; gap: 6px; }
+  .f-chip { font-size: 12px; padding: 5px 14px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); color: var(--text-2); font-weight: 600; transition: all .15s; }
+  .f-chip:hover { border-color: var(--primary); color: var(--primary); }
+  .f-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .issue-card {
+    background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--problem);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px 18px; margin-bottom: 12px;
+    animation: rise .35s ease both; transition: box-shadow .2s;
+  }
+  .issue-card:hover { box-shadow: 0 2px 4px rgba(30,41,59,.06), 0 10px 28px rgba(30,41,59,.10); }
+  .issue-card.done { border-left-color: var(--solution); }
+  .issue-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .status-pill { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; }
+  .status-pill.open { background: var(--problem-bg); color: var(--problem-deep); }
+  .status-pill.done { background: var(--solution-bg); color: var(--solution-deep); }
+  .issue-head h3 { font-size: 15px; font-weight: 700; flex: 1; min-width: 180px; }
+  .issue-desc { font-size: 13.5px; color: var(--text); line-height: 1.65; margin-top: 10px; }
+  .issue-solution {
+    background: var(--solution-bg); border-left: 3px solid var(--solution); border-radius: 0 8px 8px 0;
+    padding: 10px 12px; margin-top: 10px; font-size: 13px; line-height: 1.6;
+  }
+  .issue-solution b { color: var(--solution-deep); font-size: 11.5px; display: block; margin-bottom: 4px; }
+  .issue-foot { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text-3); flex-wrap: wrap; }
+  .issue-foot .link { color: var(--primary); font-weight: 600; cursor: pointer; }
+  .issue-foot .link:hover { text-decoration: underline; }
+  .op-btn { font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 8px; transition: all .15s; }
+  .op-btn.done { color: var(--solution-deep); background: var(--solution-bg); }
+  .op-btn.done:hover { background: var(--solution); color: #fff; }
+  .op-btn.del { color: #dc2626; background: #fef2f2; }
+  .op-btn.del:hover { background: #dc2626; color: #fff; }
+
+  .empty-hint { text-align: center; color: var(--text-3); padding: 60px 0; font-size: 13.5px; }
+
+  /* ---------- 右栏 OverviewPanel.vue ---------- */
+  .panel-right { background: var(--card); border-left: 1px solid var(--border); overflow-y: auto; padding: 16px; }
+  .ov-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .ov-title { font-size: 12px; font-weight: 700; color: var(--text-2); margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .ring-box { display: flex; align-items: center; gap: 18px; }
+  .ring {
+    width: 92px; height: 92px; border-radius: 50%; flex-shrink: 0; position: relative;
+    display: grid; place-items: center;
+  }
+  .ring::after { content: ""; width: 66px; height: 66px; border-radius: 50%; background: var(--bg); }
+  .ring span { position: absolute; font-size: 16px; font-weight: 800; color: var(--solution-deep); }
+  .ring-legend { font-size: 12.5px; color: var(--text-2); line-height: 2; }
+  .ring-legend b { color: var(--text); }
+  .week-bars { display: flex; align-items: flex-end; gap: 8px; height: 84px; padding-top: 4px; }
+  .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .bar { width: 100%; max-width: 26px; background: var(--primary-bg); border-radius: 5px 5px 3px 3px; position: relative; transition: background .2s; }
+  .bar:hover { background: var(--primary); }
+  .bar .bar-tip { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-size: 10.5px; color: var(--text-2); font-weight: 700; }
+  .bar-label { font-size: 10.5px; color: var(--text-3); }
+  .hot-list { display: flex; flex-direction: column; gap: 9px; }
+  .hot-item { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+  .hot-rank { width: 20px; height: 20px; border-radius: 6px; background: #fff; border: 1px solid var(--border); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--primary); flex-shrink: 0; }
+  .hot-item .tag { font-size: 10.5px; flex-shrink: 0; }
+  .hot-item .bar-mini { flex: 1; height: 7px; background: var(--primary-bg); border-radius: 4px; overflow: hidden; }
+  .hot-item .bar-mini i { display: block; height: 100%; background: var(--primary); border-radius: 4px; }
+  .hot-item .n { font-size: 11px; color: var(--text-3); flex-shrink: 0; }
+
+  /* ---------- 弹窗 QuickRecordModal.vue / IssueModal.vue ---------- */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(15, 23, 42, .45); backdrop-filter: blur(3px);
+    display: none; align-items: flex-start; justify-content: center; z-index: 100; padding-top: 9vh;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    width: 540px; max-width: 92vw; background: #fff; border-radius: 18px;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .3); animation: rise .28s ease both; overflow: hidden;
+  }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 0; }
+  .modal-head h3 { font-size: 17px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .modal-close { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: var(--text-2); }
+  .modal-close:hover { background: var(--bg); color: var(--text); }
+  .modal-body { padding: 16px 22px 22px; display: flex; flex-direction: column; gap: 13px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
+  .field label .req { color: #ef4444; }
+  .field input[type="text"], .field input[type="date"], .field textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; font-size: 13.5px;
+    background: var(--bg); transition: all .15s; resize: vertical;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--primary); background: #fff; box-shadow: 0 0 0 3px var(--primary-bg); }
+  .field textarea { min-height: 64px; line-height: 1.6; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .chip-select { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hint { font-size: 11.5px; color: var(--text-3); margin-top: 4px; }
+  .modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 0 22px 22px; }
+
+  .toast-wrap { position: fixed; bottom: 26px; right: 26px; display: flex; flex-direction: column; gap: 10px; z-index: 200; }
+  .toast {
+    background: #1e293b; color: #fff; font-size: 13px; padding: 11px 18px; border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, .35); display: flex; align-items: center; gap: 8px; animation: rise .3s ease both;
+  }
+  .toast .ico { color: #34d399; font-weight: 800; }
+
+  @media (max-width: 1360px) { .main { grid-template-columns: 232px 1fr 300px; } }
+  @media (max-width: 1180px) { .panel-left { display: none; } .main { grid-template-columns: 1fr 320px; } }
+  @media (max-width: 900px) { .panel-right { display: none; } .main { grid-template-columns: 1fr; } .brand-name small { display: none; } }
+  @media (max-width: 700px) { .kbd { display: none; } .topbar-actions .btn-ghost { display: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ==================== 顶栏 TopBar.vue ==================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-logo">记</div>
+      <div class="brand-name">工作日志台<small>日报 · 问题 · 双独立模块</small></div>
+    </div>
+
+    <!-- 全局搜索：同时检索日报与问题 -->
+    <div class="search-box">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="global-search" type="text" placeholder="搜索日报或问题，如「缓存击穿」「N+1」「08-10」…">
+      <span class="kbd">Ctrl K</span>
+    </div>
+
+    <div class="topbar-actions">
+      <!-- 日报与问题是两个平级的独立记录入口 -->
+      <button class="btn btn-ghost" onclick="toast('周报导出功能（原型演示）')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        导出周报
+      </button>
+      <button class="btn btn-problem" onclick="openIssueModal()">⚠ 记录问题</button>
+      <button class="btn btn-primary" onclick="openReportModal()">＋ 记录日报</button>
+      <div class="avatar">陈</div>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- ==================== 左栏 SidebarHeatmap.vue ==================== -->
+    <aside class="panel-left">
+      <div class="panel-title">工作热力图 <span class="link" onclick="toast('可切换年度视图')">2026 年 ›</span></div>
+      <div class="hm-month">近 15 周</div>
+      <div class="hm-wrap" id="hm-grid"></div>
+      <div class="hm-legend">少 <span class="hm-cell"></span><span class="hm-cell l1"></span><span class="hm-cell l2"></span><span class="hm-cell l3"></span><span class="hm-cell l4"></span> 多</div>
+
+      <div class="divider"></div>
+      <div class="panel-title">数据概览</div>
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-num primary" id="st-reports">0</div><div class="stat-label">累计日报</div></div>
+        <div class="stat-card"><div class="stat-num amber" id="st-month">0</div><div class="stat-label">本月日报</div></div>
+        <div class="stat-card"><div class="stat-num" id="st-open">0</div><div class="stat-label">待解决问题</div></div>
+        <div class="stat-card"><div class="stat-num green" id="st-done">0</div><div class="stat-label">已解决问题</div></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-title">日报标签筛选</div>
+      <div class="tag-list" id="filter-tags">
+        <span class="tag-chip active" data-f="all">全部</span>
+        <span class="tag-chip" data-f="后端">后端</span>
+        <span class="tag-chip" data-f="前端">前端</span>
+        <span class="tag-chip" data-f="数据库">数据库</span>
+        <span class="tag-chip" data-f="Redis">Redis</span>
+        <span class="tag-chip" data-f="运维">运维</span>
+      </div>
+    </aside>
+
+    <!-- ==================== 中栏 MainView.vue：日报 / 问题 双主视图 ==================== -->
+    <main class="timeline">
+      <div class="timeline-inner">
+        <div class="tl-head">
+          <div class="center-tabs">
+            <button class="tab-main active" id="tab-reports" onclick="switchMain('reports')">📋 日报 <span class="cnt" id="cnt-reports">0</span></button>
+            <button class="tab-main" id="tab-issues" onclick="switchMain('issues')">⚠ 问题 <span class="cnt" id="cnt-issues">0</span></button>
+          </div>
+          <div class="tl-stat" id="tl-stat"></div>
+        </div>
+
+        <!-- 日报视图 -->
+        <div id="view-reports"></div>
+        <!-- 问题视图 -->
+        <div id="view-issues" style="display:none">
+          <div class="issue-toolbar">
+            <div class="issue-filter">
+              <span class="f-chip active" data-s="all">全部</span>
+              <span class="f-chip" data-s="open">待解决</span>
+              <span class="f-chip" data-s="done">已解决</span>
+            </div>
+            <button class="btn btn-problem" style="padding:6px 14px;font-size:12.5px" onclick="openIssueModal()">＋ 记录问题</button>
+          </div>
+          <div id="issue-list"></div>
+          <div class="empty-hint" id="empty-issues" style="display:none">暂无匹配的问题</div>
+        </div>
+
+        <div class="empty-hint" id="empty-reports" style="display:none">未找到匹配的日报，换个关键词试试～</div>
+      </div>
+    </main>
+
+    <!-- ==================== 右栏 OverviewPanel.vue ==================== -->
+    <aside class="panel-right">
+      <div class="ov-card">
+        <div class="ov-title">✅ 问题解决率</div>
+        <div class="ring-box">
+          <div class="ring" id="solve-ring"><span id="solve-pct">0%</span></div>
+          <div class="ring-legend">待解决 <b id="lg-open">0</b> 个<br>已解决 <b id="lg-done">0</b> 个</div>
+        </div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-title">📊 本周日报分布</div>
+        <div class="week-bars" id="week-bars"></div>
+      </div>
+      <div class="ov-card">
+        <div class="ov-title">🔥 高频问题类型 TOP3</div>
+        <div class="hot-list" id="hot-list"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ==================== 记录日报弹窗 QuickReportModal.vue ==================== -->
+<div class="overlay" id="overlay-report">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>📋 记录日报</h3>
+      <button class="modal-close" onclick="closeModal('overlay-report')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-row">
+        <div class="field">
+          <label>日期 <span class="req">*</span></label>
+          <input type="date" id="r-date">
+        </div>
+        <div class="field">
+          <label>时间段（可选）</label>
+          <input type="text" id="r-time" placeholder="如 09:30 - 18:20">
+        </div>
+      </div>
+      <div class="field">
+        <label>今日工作内容 <span class="req">*</span></label>
+        <textarea id="r-content" placeholder="分条列出，如：&#10;1. 完成订单列表接口压测&#10;2. 修复库存扣减并发问题"></textarea>
+      </div>
+      <div class="field">
+        <label>标签</label>
+        <div class="chip-select" id="r-tags">
+          <span class="tag-chip" data-v="后端">后端</span>
+          <span class="tag-chip" data-v="前端">前端</span>
+          <span class="tag-chip" data-v="数据库">数据库</span>
+          <span class="tag-chip" data-v="Redis">Redis</span>
+          <span class="tag-chip" data-v="运维">运维</span>
+        </div>
+        <div class="hint">遇到问题请使用「⚠ 记录问题」独立沉淀，日报仅记录工作内容</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('overlay-report')">取消</button>
+      <button class="btn btn-primary" onclick="saveReport()">保存日报</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 记录问题弹窗 IssueModal.vue ==================== -->
+<div class="overlay" id="overlay-issue">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>⚠ 记录问题</h3>
+      <button class="modal-close" onclick="closeModal('overlay-issue')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>问题标题 <span class="req">*</span></label>
+        <input type="text" id="i-title" placeholder="一句话概括，如：Redis 缓存击穿导致慢查询">
+      </div>
+      <div class="field">
+        <label>问题描述 <span class="req">*</span></label>
+        <textarea id="i-desc" placeholder="背景、现象、影响范围…"></textarea>
+      </div>
+      <div class="field">
+        <label>解决方案（选填，填写后自动标记为已解决）</label>
+        <textarea id="i-solution" placeholder="如何排查与解决的关键步骤…"></textarea>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>标签</label>
+          <div class="chip-select" id="i-tags">
+            <span class="tag-chip" data-v="后端">后端</span>
+            <span class="tag-chip" data-v="前端">前端</span>
+            <span class="tag-chip" data-v="数据库">数据库</span>
+            <span class="tag-chip" data-v="Redis">Redis</span>
+            <span class="tag-chip" data-v="运维">运维</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>关联日报日期（可选）</label>
+          <input type="date" id="i-date">
+          <div class="hint">留空则为独立问题，不依赖日报</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('overlay-issue')">取消</button>
+      <button class="btn btn-problem" onclick="saveIssue()">保存问题</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script>
+/* ==================== 演示数据（真实项目来自后端接口） ==================== */
+/* 日报：只含工作内容，与问题解耦 */
+const REPORTS = [
+  { date: "2026-08-10", week: "星期一", isToday: true, time: "09:30 - 18:20", title: "订单模块性能优化 & 缓存改造", tags: ["后端", "Redis"],
+    tasks: ["完成订单列表接口压测，QPS 由 800 提升至 2400", "订单详情接入 Redis 缓存，命中率 92%", "修复库存扣减并发场景下的超卖问题"] },
+  { date: "2026-08-07", week: "星期五", time: "10:00 - 19:00", title: "报表导出功能联调", tags: ["前端", "数据库"],
+    tasks: ["完成月度报表导出接口联调", "优化导出文件生成流程，支持后台异步任务"] },
+  { date: "2026-08-06", week: "星期四", time: "09:00 - 18:00", title: "登录模块接入 JWT + 网关鉴权", tags: ["后端"],
+    tasks: ["完成 JWT 签发与刷新流程", "网关统一接入 Token 校验过滤器"] },
+  { date: "2026-08-05", week: "星期三", time: "09:30 - 18:30", title: "前端组件库搭建与页面开发", tags: ["前端"],
+    tasks: ["完成基础组件库目录搭建（Button / Table / Form）", "开发日报列表页与详情抽屉"] },
+  { date: "2026-08-04", week: "星期二", time: "09:00 - 17:40", title: "测试环境部署与 CI 流程", tags: ["运维"],
+    tasks: ["编写 Dockerfile 并接入 Jenkins 流水线", "完成测试环境一键部署"] },
+  { date: "2026-08-03", week: "星期一", time: "09:00 - 18:00", title: "项目初始化与技术选型", tags: ["后端", "前端", "数据库"],
+    tasks: ["完成 Spring Boot + MySQL + Redis 基础工程搭建", "确定 Vue3 + Vite 前端工程结构", "设计日报、问题、标签核心表结构"] }
+];
+
+/* 问题：独立实体，status 支持 open(待解决) / done(已解决)，reportDate 为可选的日报关联 */
+let ISSUES = [
+  { id: 1, title: "Redis 缓存击穿导致慢查询", desc: "热点订单数据缓存击穿，瞬时高并发请求直接打到 MySQL，出现多条慢查询", solution: "本地缓存 + Redis 分布式锁双重兜底，缓存设置逻辑过期并异步刷新", tag: "Redis", status: "done", createdAt: "2026-08-10", reportDate: "2026-08-10" },
+  { id: 2, title: "报表查询 N+1 导致接口超时", desc: "报表明细查询在循环中逐条查库，SQL 执行 200+ 次", solution: "关联查询 + 批量 IN 替代循环单查，SQL 次数降到 3 次", tag: "数据库", status: "done", createdAt: "2026-08-07", reportDate: "2026-08-07" },
+  { id: 3, title: "大列表渲染卡顿掉帧", desc: "5 万行报表明细渲染导致滚动掉帧", solution: "虚拟滚动 + 分页加载，仅渲染可视区域，首屏 2.3s → 0.4s", tag: "前端", status: "done", createdAt: "2026-08-07", reportDate: "2026-08-07" },
+  { id: 4, title: "网关 Token 校验重复查 Redis", desc: "每个请求重复解析 Token，多次查 Redis，接口延迟增加约 40ms", solution: "请求链路内 Token 只解析一次 + 黑名单机制，耗时降低 60%", tag: "后端", status: "done", createdAt: "2026-08-06", reportDate: "2026-08-06" },
+  { id: 5, title: "跨域请求被浏览器拦截", desc: "本地开发环境跨域请求被拦截，接口无法联调", solution: "网关 CORS 白名单 + Vite/Nginx 代理转发", tag: "前端", status: "done", createdAt: "2026-08-05", reportDate: "2026-08-05" },
+  { id: 6, title: "Docker 容器内存溢出", desc: "测试环境容器运行一段时间后被 OOM Kill", solution: "JVM 堆参数与容器限额对齐 + 健康检查自动重启", tag: "运维", status: "done", createdAt: "2026-08-04", reportDate: "2026-08-04" },
+  { id: 7, title: "定时任务偶发重复执行", desc: "分布式环境下定时任务被多个节点同时触发，导致数据重复写入（独立记录，暂无关联日报）", solution: "", tag: "后端", status: "open", createdAt: "2026-08-10", reportDate: "" },
+  { id: 8, title: "图片上传偶现 413 错误", desc: "上传大图时网关返回 413，怀疑 Nginx client_max_body_size 限制（独立记录，暂无关联日报）", solution: "", tag: "运维", status: "open", createdAt: "2026-08-07", reportDate: "" }
+];
+
+const TAG_CLASS = { "后端": "tag-backend", "前端": "tag-frontend", "数据库": "tag-db", "Redis": "tag-redis", "运维": "tag-ops" };
+const WEEK_CN = ["日", "一", "二", "三", "四", "五", "六"];
+let curFilter = "all";        // 日报标签筛选
+let curIssueFilter = "all";   // 问题状态筛选
+let curMain = "reports";      // 当前主视图
+let searchKw = "";            // 全局搜索词
+
+/* ==================== 热力图 ==================== */
+(function renderHeatmap() {
+  const grid = document.getElementById("hm-grid");
+  const today = new Date(2026, 7, 10);
+  let html = "";
+  for (let w = 14; w >= 0; w--) {
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay() - w * 7);
+    html += '<div class="hm-col">';
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(weekStart); day.setDate(weekStart.getDate() + d);
+      if (day > today) { html += '<div class="hm-cell" style="visibility:hidden"></div>'; continue; }
+      const seed = day.getFullYear() * 10000 + (day.getMonth() + 1) * 100 + day.getDate();
+      const hash = (seed * 9301 + 49297) % 233280;
+      const r = hash / 233280;
+      const level = r > 0.92 ? 4 : r > 0.75 ? 3 : r > 0.45 ? 2 : r > 0.15 ? 1 : 0;
+      const isToday = day.toDateString() === today.toDateString();
+      const label = (day.getMonth() + 1) + "-" + day.getDate() + " 周" + WEEK_CN[day.getDay()];
+      html += '<div class="hm-cell l' + level + (isToday ? " today" : "") + '" onclick="scrollToDay(\'' + seed + '\')" title="' + label + (level ? "（" + level * 2 + " 条记录）" : "（无记录）") + '"></div>';
+    }
+    html += "</div>";
+  }
+  grid.innerHTML = html;
+})();
+
+function scrollToDay(seed) {
+  switchMain("reports");
+  const el = document.getElementById("day-" + seed);
+  if (!el) { toast("该日期暂无日报"); return; }
+  setTimeout(() => {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1600);
+  }, 60);
+}
+
+/* ==================== 主视图切换 ==================== */
+function switchMain(v) {
+  curMain = v;
+  document.getElementById("tab-reports").classList.toggle("active", v === "reports");
+  document.getElementById("tab-issues").classList.toggle("active", v === "issues");
+  document.getElementById("view-reports").style.display = v === "reports" ? "block" : "none";
+  document.getElementById("view-issues").style.display = v === "issues" ? "block" : "none";
+  renderAll();
+}
+
+/* ==================== 渲染 ==================== */
+function renderAll() {
+  renderReports();
+  renderIssues();
+  renderStats();
+}
+
+function renderReports() {
+  const list = REPORTS.filter(r => {
+    const txt = (r.title + " " + r.date + " " + r.week + " " + r.tasks.join(" ") + " " + r.tags.join(" ")).toLowerCase();
+    const kwOk = !searchKw || txt.includes(searchKw);
+    const tagOk = curFilter === "all" || r.tags.includes(curFilter);
+    return kwOk && tagOk;
+  });
+  document.getElementById("cnt-reports").textContent = REPORTS.length;
+  const wrap = document.getElementById("view-reports");
+  if (!list.length) { wrap.innerHTML = ""; document.getElementById("empty-reports").style.display = "block"; return; }
+  document.getElementById("empty-reports").style.display = "none";
+  wrap.innerHTML = list.map(r => {
+    const [y, m, d] = r.date.split("-");
+    const seed = y + m + d;
+    const tagsHtml = r.tags.map(t => '<span class="tag ' + (TAG_CLASS[t] || "tag-backend") + '">' + t + "</span>").join("");
+    const tasksHtml = r.tasks.map(t => "<li>" + t + "</li>").join("");
+    /* 可选：日报底部列出关联的问题（有 reportDate 匹配才显示） */
+    const linked = ISSUES.filter(i => i.reportDate === r.date);
+    const linkHtml = linked.length
+      ? '<div class="rc-links">' + linked.map(i =>
+          '<span class="rc-link" onclick="gotoIssue(' + i.id + ')"><span>⚠</span>' + i.title + '</span>').join("") + "</div>"
+      : "";
+    const todayPill = r.isToday ? '<span class="today-pill">今天</span>' : "";
+    return '<section class="day-group" id="day-' + seed + '">' +
+      '<header class="day-head"><div class="day-cal"><span class="d">' + parseInt(d, 10) + '</span><span class="m">' + parseInt(m, 10) + "月</span></div>" +
+      '<div class="day-meta"><div class="week">' + r.week + todayPill + '</div><div class="desc">' + r.tasks.length + " 条工作 · " + linked.length + " 个关联问题</div></div>" +
+      '<div class="day-actions"><button class="btn btn-ghost" style="padding:6px 12px;font-size:12.5px" onclick="openReportModal(\'' + r.date + '\')">＋ 补记</button></div></header>' +
+      '<article class="report-card"><div class="rc-head"><span class="rc-time">' + r.time + '</span><h3>' + r.title + "</h3>" + tagsHtml + "</div>" +
+      '<ul class="rc-tasks">' + tasksHtml + "</ul>" + linkHtml +
+      '<footer class="rc-foot"><span class="rc-edit">编辑</span><span class="rc-edit">删除</span></footer>' +
+      "</article></section>";
+  }).join("");
+}
+
+function renderIssues() {
+  const list = ISSUES.filter(i => {
+    const txt = (i.title + " " + i.desc + " " + (i.solution || "") + " " + i.tag + " " + i.createdAt).toLowerCase();
+    const kwOk = !searchKw || txt.includes(searchKw);
+    const stOk = curIssueFilter === "all" || i.status === curIssueFilter;
+    return kwOk && stOk;
+  });
+  document.getElementById("cnt-issues").textContent = ISSUES.length;
+  const wrap = document.getElementById("issue-list");
+  if (!list.length) { wrap.innerHTML = ""; document.getElementById("empty-issues").style.display = "block"; return; }
+  document.getElementById("empty-issues").style.display = "none";
+  wrap.innerHTML = list.map(i => {
+    const stPill = i.status === "done"
+      ? '<span class="status-pill done">✔ 已解决</span>'
+      : '<span class="status-pill open">⏳ 待解决</span>';
+    const solHtml = i.status === "done" && i.solution
+      ? '<div class="issue-solution"><b>✔ 解决方案</b>' + i.solution + "</div>" : "";
+    const linkReport = i.reportDate
+      ? '<span class="link" onclick="scrollToDayByDate(\'' + i.reportDate + '\')">关联日报 ' + i.reportDate.slice(5) + ' ›</span>'
+      : '<span style="opacity:.75">独立问题 · 未关联日报</span>';
+    const btn = i.status === "done"
+      ? '<button class="op-btn done" onclick="toggleIssueStatus(' + i.id + ')">↺ 重新打开</button>'
+      : '<button class="op-btn done" onclick="toggleIssueStatus(' + i.id + ')">✔ 标记已解决</button>';
+    return '<article class="issue-card ' + i.status + '">' +
+      '<div class="issue-head">' + stPill + '<h3>' + i.title + '</h3>' +
+      '<span class="tag ' + (TAG_CLASS[i.tag] || "tag-backend") + '">' + i.tag + "</span></div>" +
+      '<p class="issue-desc">' + i.desc + "</p>" + solHtml +
+      '<div class="issue-foot"><span>创建于 ' + i.createdAt + "</span>" + linkReport +
+      '<span style="margin-left:auto;display:flex;gap:8px">' + btn +
+      '<button class="op-btn del" onclick="delIssue(' + i.id + ')">删除</button></span></div>' +
+      "</article>";
+  }).join("");
+}
+
+/* ==================== 统计与右栏 ==================== */
+function renderStats() {
+  const done = ISSUES.filter(i => i.status === "done").length;
+  const open = ISSUES.length - done;
+  const pct = ISSUES.length ? Math.round(done / ISSUES.length * 100) : 0;
+  document.getElementById("st-reports").textContent = REPORTS.length;
+  document.getElementById("st-month").textContent = REPORTS.filter(r => r.date.startsWith("2026-08")).length;
+  document.getElementById("st-open").textContent = open;
+  document.getElementById("st-done").textContent = done;
+  document.getElementById("solve-pct").textContent = pct + "%";
+  document.getElementById("lg-open").textContent = open;
+  document.getElementById("lg-done").textContent = done;
+  document.getElementById("solve-ring").style.background =
+    "conic-gradient(var(--solution) 0 " + pct + "%, #e2e8f0 " + pct + "% 100%)";
+  /* 本周日报分布 */
+  const days = ["一", "二", "三", "四", "五", "六", "日"];
+  const bars = [2, 1, 1, 1, 1, 0, 1];
+  const max = Math.max(...bars);
+  document.getElementById("week-bars").innerHTML = bars.map((b, i) =>
+    '<div class="bar-wrap"><div class="bar" style="height:' + (b / max * 100) + '%"><span class="bar-tip">' + b + '</span></div><span class="bar-label">' + days[i] + "</span></div>"
+  ).join("");
+  /* 高频问题类型 */
+  const tagCount = {};
+  ISSUES.forEach(i => { tagCount[i.tag] = (tagCount[i.tag] || 0) + 1; });
+  const top = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const maxC = top[0] ? top[0][1] : 1;
+  document.getElementById("hot-list").innerHTML = top.length ? top.map((t, i) =>
+    '<div class="hot-item"><span class="hot-rank">' + (i + 1) + '</span><span class="tag ' + (TAG_CLASS[t[0]] || "tag-backend") + '">' + t[0] + '</span><div class="bar-mini"><i style="width:' + (t[1] / maxC * 100) + '%"></i></div><span class="n">' + t[1] + " 个</span></div>"
+  ).join("") : '<div style="color:var(--text-3);font-size:12px">暂无数据</div>';
+}
+
+/* ==================== 问题操作 ==================== */
+function toggleIssueStatus(id) {
+  const it = ISSUES.find(i => i.id === id);
+  if (!it) return;
+  if (it.status === "done") { it.status = "open"; toast("问题已重新打开"); }
+  else { it.status = "done"; toast("问题已标记解决 ✔"); }
+  renderAll();
+}
+function delIssue(id) {
+  ISSUES = ISSUES.filter(i => i.id !== id);
+  renderAll();
+  toast("问题已删除");
+}
+function gotoIssue(id) {
+  /* 跳转前重置问题视图的筛选与搜索，保证目标可见 */
+  curIssueFilter = "all"; searchKw = "";
+  document.getElementById("global-search").value = "";
+  document.querySelectorAll(".issue-filter .f-chip").forEach(c => c.classList.toggle("active", c.dataset.s === "all"));
+  switchMain("issues");
+  renderIssues();
+  const items = document.querySelectorAll("#issue-list .issue-card");
+  const idx = ISSUES.findIndex(i => i.id === id);
+  const target = idx >= 0 ? items[idx] : null;
+  setTimeout(() => {
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+      target.style.transition = "box-shadow .3s";
+      target.style.boxShadow = "0 0 0 3px rgba(245,158,11,.45)";
+      setTimeout(() => { target.style.boxShadow = ""; }, 2000);
+    } else { toast("未找到该问题"); }
+  }, 60);
+}
+function scrollToDayByDate(date) {
+  switchMain("reports");
+  const seed = date.replace(/-/g, "");
+  setTimeout(() => scrollToDay(seed), 60);
+}
+
+/* ==================== 弹窗 ==================== */
+function openModal(id) { document.getElementById(id).classList.add("show"); }
+function closeModal(id) { document.getElementById(id).classList.remove("show"); }
+function openReportModal(date) {
+  document.getElementById("r-date").value = date || "2026-08-10";
+  document.getElementById("r-time").value = "";
+  document.getElementById("r-content").value = "";
+  clearChips("r-tags");
+  openModal("overlay-report");
+  setTimeout(() => document.getElementById("r-content").focus(), 60);
+}
+function openIssueModal() {
+  document.getElementById("i-title").value = "";
+  document.getElementById("i-desc").value = "";
+  document.getElementById("i-solution").value = "";
+  document.getElementById("i-date").value = "";
+  clearChips("i-tags");
+  openModal("overlay-issue");
+  setTimeout(() => document.getElementById("i-title").focus(), 60);
+}
+function clearChips(containerId) {
+  document.querySelectorAll("#" + containerId + " .tag-chip").forEach(c => c.classList.remove("active"));
+}
+function getChips(containerId) {
+  return [...document.querySelectorAll("#" + containerId + " .tag-chip.active")].map(c => c.dataset.v);
+}
+function bindChips(containerId) {
+  document.getElementById(containerId).addEventListener("click", function (e) {
+    const chip = e.target.closest(".tag-chip");
+    if (!chip) return;
+    chip.classList.toggle("active");
+  });
+}
+bindChips("r-tags"); bindChips("i-tags");
+document.querySelectorAll(".overlay").forEach(o => o.addEventListener("click", function (e) { if (e.target === this) this.classList.remove("show"); }));
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") document.querySelectorAll(".overlay.show").forEach(o => o.classList.remove("show"));
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.getElementById("global-search").focus(); }
+});
+
+/* 保存日报（不涉及问题） */
+function saveReport() {
+  const date = document.getElementById("r-date").value;
+  const content = document.getElementById("r-content").value.trim();
+  if (!date || !content) { toast("日期与工作内容为必填项"); return; }
+  const dt = new Date(date.replace(/-/g, "/"));
+  const tasks = content.split("\n").map(s => s.replace(/^\d+[.、]\s*/, "").trim()).filter(Boolean);
+  const item = {
+    date, week: "星期" + WEEK_CN[dt.getDay()], time: document.getElementById("r-time").value.trim() || "09:00 - 18:00",
+    title: tasks[0] || "未命名记录", tags: getChips("r-tags").length ? getChips("r-tags") : ["后端"], tasks
+  };
+  const idx = REPORTS.findIndex(x => x.date === date);
+  if (idx >= 0) REPORTS.splice(idx, 1);
+  REPORTS.unshift(item);
+  renderAll();
+  closeModal("overlay-report");
+  toast("日报已保存 ✔");
+}
+
+/* 保存问题（独立实体，可完全脱离日报） */
+let issueSeq = 100;
+function saveIssue() {
+  const title = document.getElementById("i-title").value.trim();
+  const desc = document.getElementById("i-desc").value.trim();
+  if (!title || !desc) { toast("问题标题与描述为必填项"); return; }
+  const solution = document.getElementById("i-solution").value.trim();
+  const item = {
+    id: ++issueSeq, title, desc, solution,
+    tag: getChips("i-tags")[0] || "后端",
+    status: solution ? "done" : "open",
+    createdAt: "2026-08-10",
+    reportDate: document.getElementById("i-date").value || ""
+  };
+  ISSUES.unshift(item);
+  renderAll();
+  switchMain("issues");
+  closeModal("overlay-issue");
+  toast(solution ? "问题已解决并存档 ✔" : "问题已记录，待解决 ⏳");
+}
+
+/* ==================== 搜索联动 ==================== */
+document.getElementById("global-search").addEventListener("input", function () {
+  searchKw = this.value.trim().toLowerCase();
+  renderAll();
+});
+document.getElementById("filter-tags").addEventListener("click", function (e) {
+  const chip = e.target.closest(".tag-chip");
+  if (!chip) return;
+  document.querySelectorAll("#filter-tags .tag-chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  curFilter = chip.dataset.f;
+  renderReports();
+});
+document.querySelector(".issue-filter").addEventListener("click", function (e) {
+  const chip = e.target.closest(".f-chip");
+  if (!chip) return;
+  document.querySelectorAll(".issue-filter .f-chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  curIssueFilter = chip.dataset.s;
+  renderIssues();
+});
+
+/* ==================== Toast ==================== */
+function toast(msg) {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = '<span class="ico">✓</span>' + msg;
+  document.getElementById("toasts").appendChild(el);
+  setTimeout(() => { el.style.transition = "all .3s"; el.style.opacity = "0"; el.style.transform = "translateY(6px)"; }, 2200);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/* ==================== 初始化 ==================== */
+renderAll();
+</script>
+</body>
+</html>
