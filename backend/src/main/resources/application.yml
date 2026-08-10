@@ -6,14 +6,16 @@ spring:
     name: worklog-backend
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: "123456"
+    # 生产环境可用环境变量覆盖：DB_URL / DB_USERNAME / DB_PASSWORD
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
   data:
     redis:
-      host: 127.0.0.1
-      port: 6379
-      # password:  # 如 Redis 配置了密码请填写
+      # 生产环境可用环境变量覆盖：REDIS_HOST / REDIS_PORT / REDIS_PASSWORD
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
       timeout: 3s
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
@@ -33,10 +35,8 @@ logging:
   level:
     com.worklog: debug
 
-# JWT 配置
+# JWT 配置（生产环境务必用 JWT_SECRET 环境变量注入强密钥）
 worklog:
   jwt:
-    # HS256 密钥（生产环境务必更换并通过环境变量注入）
-    secret: worklog-jwt-secret-key-please-change-in-production-2026
-    # token 有效期（小时）
-    expire-hours: 24
+    secret: ${JWT_SECRET:worklog-jwt-secret-key-please-change-in-production-2026}
+    expire-hours: ${JWT_EXPIRE_HOURS:24}
