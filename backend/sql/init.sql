@@ -1,7 +1,10 @@
 -- ============================================================
 -- 工作日志台 数据库初始化脚本
 -- 执行方式: mysql -uroot -p < init.sql 或由后端首次启动自动执行
+-- 注意: 文件含中文默认值，必须保证连接为 utf8mb4（下方 SET NAMES 已兜底）
 -- ============================================================
+SET NAMES utf8mb4;
+
 CREATE DATABASE IF NOT EXISTS worklog DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE worklog;
 
