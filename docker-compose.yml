@@ -1,0 +1,77 @@
+# ============================================================
+# 工作日志台 Docker Compose
+# 假设 MySQL / Redis 已部署在宿主机（端口 3306 / 6379），
+# 后端容器通过 host.docker.internal 访问宿主机服务。
+# ============================================================
+
+services:
+
+  # ---------- 后端：Spring Boot ----------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: worklog-backend:latest
+    container_name: worklog-backend
+    restart: unless-stopped
+    # 让容器内能用 host.docker.internal 解析为宿主机网关 IP
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # 数据库（宿主机 MySQL）
+      DB_URL: "jdbc:mysql://host.docker.internal:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+      DB_USERNAME: "${DB_USERNAME:-worklog}"
+      DB_PASSWORD: "${DB_PASSWORD:-worklog_pwd_change_me}"
+
+      # Redis（宿主机）
+      REDIS_HOST: "host.docker.internal"
+      REDIS_PORT: "${REDIS_PORT:-6379}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-}"
+
+      # JWT
+      JWT_SECRET: "${JWT_SECRET:-please_change_me_to_a_random_32_plus_chars_secret}"
+      JWT_EXPIRE_HOURS: "${JWT_EXPIRE_HOURS:-24}"
+
+      # JVM
+      JAVA_OPTS: "-Xms256m -Xmx512m"
+
+      # 时区（@Scheduled 18:00 cron 按北京时间触发）
+      TZ: "Asia/Shanghai"
+    ports:
+      - "${BACKEND_PORT:-8089}:8089"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8089/api/auth/me"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - worklog-net
+
+  # ---------- 前端：Vue + Nginx ----------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # 容器内前端请求 /api（被 Nginx 反代到 backend:8089），不要改成绝对地址
+        VITE_API_BASE: "/api"
+    image: worklog-frontend:latest
+    container_name: worklog-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - worklog-net
+
+networks:
+  worklog-net:
+    driver: bridge

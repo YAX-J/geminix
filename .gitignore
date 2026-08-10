@@ -18,6 +18,9 @@ frontend/*.timestamp-*.mjs
 # 环境变量（本地敏感配置）
 .env.local
 .env.*.local
+.env
+# 部署示例模板（保留示例，不提交真实值）
+!.env.example
 
 # 日志与系统
 *.log
