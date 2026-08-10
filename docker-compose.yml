@@ -1,7 +1,8 @@
 # ============================================================
 # 工作日志台 Docker Compose
-# 假设 MySQL / Redis 已部署在宿主机（端口 3306 / 6379），
-# 后端容器通过 host.docker.internal 访问宿主机服务。
+# MySQL / Redis 已作为外部容器运行（docker ps 看名字），
+# 通过 `docker network connect worklog-net mysql redis` 加入网络后，
+# 后端容器直接用容器名互通（无需 host.docker.internal）。
 # ============================================================
 
 services:
@@ -14,17 +15,14 @@ services:
     image: worklog-backend:latest
     container_name: worklog-backend
     restart: unless-stopped
-    # 让容器内能用 host.docker.internal 解析为宿主机网关 IP
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     environment:
-      # 数据库（宿主机 MySQL）
-      DB_URL: "jdbc:mysql://host.docker.internal:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+      # 数据库（已存在的 mysql 容器，请确保 MYSQL_CONTAINER_NAME 与 docker ps 一致）
+      DB_URL: "jdbc:mysql://${MYSQL_CONTAINER_NAME:-mysql}:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
       DB_USERNAME: "${DB_USERNAME:-worklog}"
       DB_PASSWORD: "${DB_PASSWORD:-worklog_pwd_change_me}"
 
-      # Redis（宿主机）
-      REDIS_HOST: "host.docker.internal"
+      # Redis（已存在的 redis 容器）
+      REDIS_HOST: "${REDIS_CONTAINER_NAME:-redis}"
       REDIS_PORT: "${REDIS_PORT:-6379}"
       REDIS_PASSWORD: "${REDIS_PASSWORD:-}"
 
@@ -75,3 +73,4 @@ services:
 networks:
   worklog-net:
     driver: bridge
+    name: worklog-net
