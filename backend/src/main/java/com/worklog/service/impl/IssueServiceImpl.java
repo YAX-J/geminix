@@ -1,10 +1,13 @@
 package com.worklog.service.impl;
 
+import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.worklog.common.BusinessException;
+import com.worklog.dto.IssueExcelRow;
 import com.worklog.dto.IssueReq;
 import com.worklog.entity.Issue;
+import com.worklog.entity.Issue.IssueSolution;
 import com.worklog.mapper.IssueMapper;
 import com.worklog.service.IssueService;
 import com.worklog.service.StatsService;
@@ -12,6 +15,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.io.ByteArrayOutputStream;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 @Service
@@ -38,7 +43,8 @@ public class IssueServiceImpl implements IssueService {
         if (StringUtils.hasText(tag)) {
             qw.eq(Issue::getTag, tag.trim());
         }
-        qw.orderByDesc(Issue::getCreatedAt).orderByDesc(Issue::getId);
+        // 常见问题（收藏）置顶，其次最新创建
+        qw.orderByDesc(Issue::getFavorite).orderByDesc(Issue::getCreatedAt).orderByDesc(Issue::getId);
         return issueMapper.selectPage(new Page<>(page, size), qw);
     }
 
@@ -56,11 +62,12 @@ public class IssueServiceImpl implements IssueService {
         Issue issue = new Issue();
         issue.setTitle(req.getTitle());
         issue.setDescription(req.getDescription());
-        issue.setSolution(normalize(req.getSolution()));
         issue.setTag(StringUtils.hasText(req.getTag()) ? req.getTag() : "后端");
         issue.setReportDate(req.getReportDate());
-        // 填写了解决方案且未指定状态 -> 自动已解决
-        if (StringUtils.hasText(issue.getSolution())) {
+        issue.setFavorite(Boolean.TRUE.equals(req.getFavorite()));
+        applySolutions(issue, req);
+        // 有方案（solution 或 solutions 非空）且未指定状态 -> 自动已解决
+        if (StringUtils.hasText(issue.getSolution()) || hasAnySolution(issue.getSolutions())) {
             issue.setStatus("done");
         } else {
             issue.setStatus(StringUtils.hasText(req.getStatus()) ? req.getStatus() : "open");
@@ -76,11 +83,14 @@ public class IssueServiceImpl implements IssueService {
         Issue exist = getIssue(id);
         exist.setTitle(req.getTitle());
         exist.setDescription(req.getDescription());
-        exist.setSolution(normalize(req.getSolution()));
         if (StringUtils.hasText(req.getTag())) {
             exist.setTag(req.getTag());
         }
         exist.setReportDate(req.getReportDate());
+        if (req.getFavorite() != null) {
+            exist.setFavorite(req.getFavorite());
+        }
+        applySolutions(exist, req);
         if (StringUtils.hasText(req.getStatus())) {
             validateStatus(req.getStatus());
             exist.setStatus(req.getStatus());
@@ -103,10 +113,76 @@ public class IssueServiceImpl implements IssueService {
     }
 
     @Override
+    public Issue toggleFavorite(Long id) {
+        Issue exist = getIssue(id);
+        exist.setFavorite(!Boolean.TRUE.equals(exist.getFavorite()));
+        issueMapper.updateById(exist);
+        return exist;
+    }
+
+    @Override
     public void deleteIssue(Long id) {
         getIssue(id);
         issueMapper.deleteById(id);
         statsService.evictStats();
+    }
+
+    @Override
+    public byte[] exportExcel() {
+        List<Issue> issues = issueMapper.selectList(new LambdaQueryWrapper<Issue>()
+                .orderByDesc(Issue::getCreatedAt).orderByDesc(Issue::getId));
+        DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+        List<IssueExcelRow> rows = issues.stream().map(i -> {
+            IssueExcelRow row = new IssueExcelRow();
+            row.setTitle(i.getTitle() == null ? "" : i.getTitle());
+            row.setDescription(i.getDescription() == null ? "" : i.getDescription());
+            row.setSolution(i.getSolution() == null ? "" : i.getSolution());
+            row.setTag(i.getTag() == null ? "" : i.getTag());
+            row.setStatus("done".equals(i.getStatus()) ? "已解决" : "待解决");
+            row.setReportDate(i.getReportDate() == null ? "" : i.getReportDate().toString());
+            row.setCreatedAt(i.getCreatedAt() == null ? "" : i.getCreatedAt().format(df));
+            return row;
+        }).toList();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        EasyExcel.write(out, IssueExcelRow.class).sheet("问题").doWrite(rows);
+        return out.toByteArray();
+    }
+
+    /**
+     * 处理多方案：清洗非法项，best 方案摘要同步回 solution（兼容旧字段），
+     * 请求未传 solutions 时保留原值（编辑场景）。
+     */
+    private void applySolutions(Issue issue, IssueReq req) {
+        List<IssueSolution> reqSolutions = req.getSolutions();
+        if (reqSolutions == null) {
+            // 未传多方案：仅当显式传了 solution 时覆盖摘要
+            if (req.getSolution() != null) {
+                issue.setSolution(normalize(req.getSolution()));
+            }
+            return;
+        }
+        List<IssueSolution> cleaned = reqSolutions.stream()
+                .filter(s -> s != null && StringUtils.hasText(s.getContent()))
+                .map(s -> {
+                    IssueSolution ns = new IssueSolution();
+                    ns.setContent(s.getContent().trim());
+                    ns.setBest(Boolean.TRUE.equals(s.getBest()));
+                    return ns;
+                })
+                .toList();
+        issue.setSolutions(cleaned.isEmpty() ? null : cleaned);
+        // 最佳方案摘要回写 solution（无 best 则取第一个）
+        if (cleaned.isEmpty()) {
+            issue.setSolution("");
+        } else {
+            IssueSolution best = cleaned.stream().filter(s -> Boolean.TRUE.equals(s.getBest()))
+                    .findFirst().orElse(cleaned.get(0));
+            issue.setSolution(best.getContent());
+        }
+    }
+
+    private boolean hasAnySolution(List<IssueSolution> solutions) {
+        return solutions != null && !solutions.isEmpty();
     }
 
     private String normalize(String s) {

@@ -22,6 +22,16 @@
     </div>
 
     <div class="ov-card">
+      <div class="ov-title">🍩 问题类型分布</div>
+      <div ref="distEl" class="chart-box"></div>
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-title">📈 问题趋势（近 14 天）</div>
+      <div ref="trendEl" class="chart-box tall"></div>
+    </div>
+
+    <div class="ov-card">
       <div class="ov-title">🔥 高频问题类型 TOP3</div>
       <div class="hot-list">
         <div v-for="(t, i) in hotTags" :key="t.tag" class="hot-item">
@@ -37,13 +47,24 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onBeforeUnmount, watch, ref, nextTick } from 'vue'
+import * as echarts from 'echarts'
 import { useReportStore } from '@/stores/reports'
 import { useIssueStore } from '@/stores/issues'
+import { useTagStore } from '@/stores/tags'
+import { getIssueDist, getIssueTrend } from '@/api/stats'
 import { tagClassMap } from '@/mock/demoData'
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 const reportStore = useReportStore()
 const issueStore = useIssueStore()
+const tagStore = useTagStore()
+
+const distEl = ref(null)
+const trendEl = ref(null)
+let distChart = null
+let trendChart = null
 
 const ringStyle = computed(() => ({
   background: `conic-gradient(var(--solution) 0 ${issueStore.solveRate}%, #e2e8f0 ${issueStore.solveRate}% 100%)`
@@ -81,9 +102,159 @@ const hotTags = computed(() => {
   return arr.map((t) => ({ ...t, pct: (t.count / max) * 100 }))
 })
 
+/* 图表初始化 */
+function initCharts() {
+  if (distEl.value && !distChart) {
+    distChart = echarts.init(distEl.value)
+  }
+  if (trendEl.value && !trendChart) {
+    trendChart = echarts.init(trendEl.value)
+  }
+}
+
+async function renderCharts() {
+  await nextTick()
+  initCharts()
+
+  // 问题类型分布（饼图）
+  const dist = USE_MOCK ? buildLocalDist() : await getIssueDist().catch(() => [])
+  const palette = ['#6366f1', '#10b981', '#f59e0b', '#0ea5e9', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316']
+  if (distChart) {
+    distChart.setOption({
+      tooltip: { trigger: 'item', formatter: '{b}: {c} 个 ({d}%)' },
+      legend: {
+        bottom: 0,
+        icon: 'circle',
+        itemWidth: 8,
+        itemHeight: 8,
+        textStyle: { fontSize: 11, color: '#64748b' }
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: ['42%', '68%'],
+          center: ['50%', '44%'],
+          avoidLabelOverlap: true,
+          itemStyle: { borderRadius: 5, borderColor: '#fff', borderWidth: 2 },
+          label: { show: false },
+          emphasis: { label: { show: true, fontSize: 12, fontWeight: 700 } },
+          data: dist.map((d, i) => ({
+            name: d.tag,
+            value: d.count,
+            itemStyle: { color: palette[i % palette.length] }
+          }))
+        }
+      ]
+    })
+  }
+
+  // 问题趋势（折线图）
+  const trend = USE_MOCK ? buildLocalTrend(14) : await getIssueTrend(14).catch(() => null)
+  if (trendChart) {
+    trendChart.setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { bottom: 0, icon: 'circle', itemWidth: 8, itemHeight: 8, textStyle: { fontSize: 11, color: '#64748b' } },
+      grid: { left: 34, right: 16, top: 20, bottom: 40 },
+      xAxis: {
+        type: 'category',
+        data: trend?.labels || [],
+        axisLabel: { fontSize: 10, color: '#94a3b8' },
+        axisLine: { lineStyle: { color: '#e4e7ef' } }
+      },
+      yAxis: {
+        type: 'value',
+        minInterval: 1,
+        axisLabel: { fontSize: 10, color: '#94a3b8' },
+        splitLine: { lineStyle: { color: '#eef0f6' } }
+      },
+      series: [
+        {
+          name: '新增',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          data: trend?.created || [],
+          lineStyle: { width: 2.5, color: '#6366f1' },
+          itemStyle: { color: '#6366f1' },
+          areaStyle: { color: 'rgba(99,102,241,0.12)' }
+        },
+        {
+          name: '解决',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          data: trend?.solved || [],
+          lineStyle: { width: 2.5, color: '#10b981' },
+          itemStyle: { color: '#10b981' },
+          areaStyle: { color: 'rgba(16,185,129,0.10)' }
+        }
+      ]
+    })
+  }
+}
+
+function buildLocalDist() {
+  const map = {}
+  issueStore.items.forEach((i) => {
+    map[i.tag] = (map[i.tag] || 0) + 1
+  })
+  return Object.entries(map)
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+function buildLocalTrend(days) {
+  const labels = []
+  const created = []
+  const solved = []
+  const createdMap = {}
+  const solvedMap = {}
+  issueStore.items.forEach((i) => {
+    const d = (i.createdAt || '').slice(0, 10)
+    if (d) createdMap[d] = (createdMap[d] || 0) + 1
+    if (i.status === 'done') {
+      const u = (i.updatedAt || '').slice(0, 10)
+      if (u) solvedMap[u] = (solvedMap[u] || 0) + 1
+    }
+  })
+  const today = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    labels.push(`${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)
+    created.push(createdMap[key] || 0)
+    solved.push(solvedMap[key] || 0)
+  }
+  return { labels, created, solved }
+}
+
+function resizeCharts() {
+  distChart?.resize()
+  trendChart?.resize()
+}
+
 onMounted(async () => {
-  await Promise.all([reportStore.load(), issueStore.load()])
+  await Promise.all([reportStore.load(), issueStore.load(), tagStore.load()])
+  renderCharts()
+  window.addEventListener('resize', resizeCharts)
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeCharts)
+  distChart?.dispose()
+  trendChart?.dispose()
+  distChart = null
+  trendChart = null
+})
+
+// 数据变化时刷新图表
+watch(
+  () => issueStore.items.length,
+  () => renderCharts()
+)
 </script>
 
 <style scoped>
@@ -181,6 +352,12 @@ onMounted(async () => {
 .bar-label {
   font-size: 10.5px;
   color: var(--text-3);
+}
+.chart-box {
+  height: 150px;
+}
+.chart-box.tall {
+  height: 180px;
 }
 .hot-list {
   display: flex;

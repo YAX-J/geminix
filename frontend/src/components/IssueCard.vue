@@ -3,14 +3,27 @@
     <div class="issue-head">
       <span v-if="issue.status === 'done'" class="status-pill done">✔ 已解决</span>
       <span v-else class="status-pill open">⏳ 待解决</span>
+      <span v-if="issue.favorite" class="fav-pill" title="已收藏（常见问题置顶）">⭐ 收藏</span>
       <h3>{{ issue.title }}</h3>
       <span class="tag" :class="tagClassMap[issue.tag] || 'tag-backend'">{{ issue.tag }}</span>
     </div>
 
     <p class="issue-desc">{{ issue.desc }}</p>
 
-    <div v-if="issue.status === 'done' && issue.solution" class="issue-solution">
-      <b>✔ 解决方案</b>{{ issue.solution }}
+    <!-- 解决方案：最佳高亮，其余折叠 -->
+    <div v-if="solutionList.length" class="issue-solutions">
+      <div
+        v-for="(s, i) in visibleSolutions"
+        :key="i"
+        class="solution-item"
+        :class="{ best: s.best }"
+      >
+        <span v-if="s.best" class="best-badge">⭐ 最佳方案</span>
+        <span class="solution-text">{{ s.content }}</span>
+      </div>
+      <div v-if="hiddenCount > 0" class="more-toggle" @click="expanded = !expanded">
+        {{ expanded ? '收起方案 ▲' : `还有 ${hiddenCount} 个方案 ▼` }}
+      </div>
     </div>
 
     <div class="issue-foot">
@@ -19,6 +32,9 @@
       <span v-else class="orphan">独立问题 · 未关联日报</span>
 
       <span class="ops">
+        <button class="op-btn fav" :class="{ on: issue.favorite }" @click="onFavorite">
+          {{ issue.favorite ? '★ 已收藏' : '☆ 收藏' }}
+        </button>
         <button v-if="issue.status === 'done'" class="op-btn done" @click="onToggle">↺ 重新打开</button>
         <button v-else class="op-btn done" @click="onToggle">✔ 标记已解决</button>
         <button class="op-btn del" @click="onDelete">删除</button>
@@ -28,6 +44,7 @@
 </template>
 
 <script setup>
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useIssueStore } from '@/stores/issues'
 import { toast } from '@/utils/toast'
@@ -39,6 +56,31 @@ const props = defineProps({
 
 const router = useRouter()
 const issueStore = useIssueStore()
+const expanded = ref(false)
+
+/** 兼容旧数据：solutions 为空但有 solution 时，构造单条最佳方案 */
+const solutionList = computed(() => {
+  if (Array.isArray(props.issue.solutions) && props.issue.solutions.length) {
+    return props.issue.solutions.filter((s) => s && s.content)
+  }
+  if (props.issue.solution) {
+    return [{ content: props.issue.solution, best: true }]
+  }
+  return []
+})
+
+const visibleSolutions = computed(() => {
+  if (expanded.value) return solutionList.value
+  const best = solutionList.value.find((s) => s.best)
+  return best ? [best] : solutionList.value.slice(0, 1)
+})
+
+const hiddenCount = computed(() => solutionList.value.length - visibleSolutions.value.length)
+
+function onFavorite() {
+  issueStore.toggleFavorite(props.issue.id)
+  toast(props.issue.favorite ? '已取消收藏' : '已收藏，将置顶展示 ⭐')
+}
 
 function onToggle() {
   issueStore.toggleStatus(props.issue.id)
@@ -95,6 +137,16 @@ function gotoReport(date) {
   background: var(--solution-bg);
   color: var(--solution-deep);
 }
+.fav-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
 .issue-head h3 {
   font-size: 15px;
   font-weight: 700;
@@ -107,20 +159,45 @@ function gotoReport(date) {
   line-height: 1.65;
   margin-top: 10px;
 }
-.issue-solution {
-  background: var(--solution-bg);
+.issue-solutions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.solution-item {
+  background: var(--bg);
   border-left: 3px solid var(--solution);
   border-radius: 0 8px 8px 0;
-  padding: 10px 12px;
-  margin-top: 10px;
+  padding: 8px 12px;
   font-size: 13px;
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.issue-solution b {
-  color: var(--solution-deep);
-  font-size: 11.5px;
-  display: block;
-  margin-bottom: 4px;
+.solution-item.best {
+  background: var(--solution-bg);
+  border-left-color: #f59e0b;
+}
+.best-badge {
+  color: #b45309;
+  font-size: 11px;
+  font-weight: 800;
+}
+.solution-text {
+  color: var(--text);
+}
+.more-toggle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+  padding: 4px 2px;
+  user-select: none;
+}
+.more-toggle:hover {
+  text-decoration: underline;
 }
 .issue-foot {
   display: flex;
@@ -163,6 +240,17 @@ function gotoReport(date) {
 .op-btn.done:hover {
   background: var(--solution);
   color: #fff;
+}
+.op-btn.fav {
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+.op-btn.fav:hover,
+.op-btn.fav.on {
+  background: #f59e0b;
+  color: #fff;
+  border-color: #f59e0b;
 }
 .op-btn.del {
   color: #dc2626;

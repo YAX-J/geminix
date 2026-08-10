@@ -39,6 +39,8 @@ public class StatsServiceImpl implements StatsService {
     private static final String KEY_HEATMAP_PREFIX = "worklog:stats:heatmap:";
     private static final String KEY_WEEKLY = "worklog:stats:weekly";
     private static final String KEY_HOT_TAGS = "worklog:stats:hot-tags";
+    private static final String KEY_ISSUE_DIST = "worklog:stats:issue-dist";
+    private static final String KEY_ISSUE_TREND_PREFIX = "worklog:stats:issue-trend:";
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -131,9 +133,134 @@ public class StatsServiceImpl implements StatsService {
         keys.addAll(redisTemplate.keys(KEY_HEATMAP_PREFIX + "*"));
         keys.add(KEY_WEEKLY);
         keys.add(KEY_HOT_TAGS);
+        keys.add(KEY_ISSUE_DIST);
+        keys.addAll(redisTemplate.keys(KEY_ISSUE_TREND_PREFIX + "*"));
         if (!keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
+    }
+
+    @Override
+    public List<StatsVO.HotTag> issueDist() {
+        String cached = redisTemplate.opsForValue().get(KEY_ISSUE_DIST);
+        if (StringUtils.hasText(cached)) {
+            try {
+                return objectMapper.readValue(cached,
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, StatsVO.HotTag.class));
+            } catch (JsonProcessingException e) {
+                log.warn("issue-dist 缓存反序列化失败，重新查询: {}", e.getMessage());
+            }
+        }
+        QueryWrapper<Issue> qw = new QueryWrapper<>();
+        qw.select("tag", "COUNT(*) AS cnt")
+          .groupBy("tag")
+          .orderByDesc("cnt");
+        List<Map<String, Object>> rows = issueMapper.selectMaps(qw);
+        List<StatsVO.HotTag> list = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            StatsVO.HotTag ht = new StatsVO.HotTag();
+            ht.setTag(String.valueOf(row.get("tag")));
+            ht.setCount(((Number) row.get("cnt")).longValue());
+            list.add(ht);
+        }
+        try {
+            redisTemplate.opsForValue().set(KEY_ISSUE_DIST, objectMapper.writeValueAsString(list), 1, TimeUnit.HOURS);
+        } catch (JsonProcessingException e) {
+            log.warn("issue-dist 缓存序列化失败: {}", e.getMessage());
+        }
+        return list;
+    }
+
+    @Override
+    public StatsVO.IssueTrend issueTrend(int days) {
+        int n = Math.min(Math.max(days, 7), 90);
+        String key = KEY_ISSUE_TREND_PREFIX + n;
+        String cached = redisTemplate.opsForValue().get(key);
+        if (StringUtils.hasText(cached)) {
+            try {
+                return objectMapper.readValue(cached, StatsVO.IssueTrend.class);
+            } catch (JsonProcessingException e) {
+                log.warn("issue-trend 缓存反序列化失败，重新查询: {}", e.getMessage());
+            }
+        }
+        LocalDate today = LocalDate.now();
+        LocalDate start = today.minusDays(n - 1L);
+
+        // 每日新增（按 created_at 天）
+        Map<String, Long> createdMap = countByDay(issueMapper, "created_at", start, null);
+        // 每日解决（近似：status=done 且 updated_at 落在当天）
+        Map<String, Long> solvedMap = countByDay(issueMapper, "updated_at", start, "done");
+
+        DateTimeFormatter labelFmt = DateTimeFormatter.ofPattern("MM-dd");
+        List<String> labels = new ArrayList<>();
+        List<Long> created = new ArrayList<>();
+        List<Long> solved = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            LocalDate d = start.plusDays(i);
+            String fmt = d.format(DATE_FMT);
+            labels.add(d.format(labelFmt));
+            created.add(createdMap.getOrDefault(fmt, 0L));
+            solved.add(solvedMap.getOrDefault(fmt, 0L));
+        }
+        StatsVO.IssueTrend vo = new StatsVO.IssueTrend();
+        vo.setLabels(labels);
+        vo.setCreated(created);
+        vo.setSolved(solved);
+        try {
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(vo), 1, TimeUnit.HOURS);
+        } catch (JsonProcessingException e) {
+            log.warn("issue-trend 缓存序列化失败: {}", e.getMessage());
+        }
+        return vo;
+    }
+
+    @Override
+    public int streak() {
+        List<Report> reports = reportMapper.selectList(new LambdaQueryWrapper<Report>()
+                .select(Report::getReportDate));
+        Set<String> dates = new HashSet<>();
+        for (Report r : reports) {
+            if (r.getReportDate() != null) {
+                dates.add(r.getReportDate().format(DATE_FMT));
+            }
+        }
+        LocalDate today = LocalDate.now();
+        LocalDate cursor = dates.contains(today.format(DATE_FMT)) ? today : today.minusDays(1);
+        int streak = 0;
+        while (dates.contains(cursor.format(DATE_FMT))) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
+    }
+
+    /**
+     * 按天统计 issue 数量。
+     *
+     * @param column  分组列（created_at / updated_at）
+     * @param from    起始日期（含）
+     * @param status  限定状态（可空）
+     */
+    private Map<String, Long> countByDay(IssueMapper mapper,
+                                         String column, LocalDate from, String status) {
+        QueryWrapper<Issue> qw = new QueryWrapper<>();
+        qw.select("DATE(" + column + ") AS d", "COUNT(*) AS cnt")
+          .ge(column, from.atStartOfDay())
+          .groupBy("DATE(" + column + ")");
+        if (StringUtils.hasText(status)) {
+            qw.eq("status", status);
+        }
+        List<Map<String, Object>> rows = mapper.selectMaps(qw);
+        Map<String, Long> map = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            Object d = row.get("d");
+            if (d == null) continue;
+            String fmt = d instanceof java.sql.Date
+                    ? ((java.sql.Date) d).toLocalDate().format(DATE_FMT)
+                    : String.valueOf(d);
+            map.put(fmt, ((Number) row.get("cnt")).longValue());
+        }
+        return map;
     }
 
     /* ---------- 构建逻辑 ---------- */

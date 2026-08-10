@@ -3,7 +3,7 @@
     <div v-if="ui.reportModalOpen" class="overlay" @click.self="close">
       <div class="modal">
         <div class="modal-head">
-          <h3>📋 记录日报</h3>
+          <h3>{{ isEdit ? '✏️ 编辑日报' : '📋 记录日报' }}</h3>
           <button class="modal-close" @click="close">✕</button>
         </div>
         <div class="modal-body">
@@ -40,7 +40,7 @@
         </div>
         <div class="modal-foot">
           <button class="btn btn-ghost" @click="close">取消</button>
-          <button class="btn btn-primary" @click="save">保存日报</button>
+          <button class="btn btn-primary" @click="save">{{ isEdit ? '保存修改' : '保存日报' }}</button>
         </div>
       </div>
     </div>
@@ -48,27 +48,43 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, watch, computed, onMounted } from 'vue'
 import { useUiStore } from '@/stores/ui'
 import { useReportStore } from '@/stores/reports'
+import { useTagStore } from '@/stores/tags'
 import { toast } from '@/utils/toast'
 import { weekCN } from '@/mock/demoData'
 
 const ui = useUiStore()
 const reportStore = useReportStore()
+const tagStore = useTagStore()
 
-const tagOptions = ['后端', '前端', '数据库', 'Redis', '运维']
+// 标签选项：动态加载（兜底五类）
+const tagOptions = computed(() => (tagStore.names.length ? tagStore.names : ['后端', '前端', '数据库', 'Redis', '运维']))
+
+onMounted(() => tagStore.load())
 
 const form = reactive({ date: '', time: '', content: '', tags: [] })
+
+const isEdit = computed(() => !!ui.reportModalEdit)
 
 watch(
   () => ui.reportModalOpen,
   (open) => {
     if (!open) return
-    form.date = ui.reportModalDate || todayStr()
-    form.time = ''
-    form.content = ''
-    form.tags = []
+    const edit = ui.reportModalEdit
+    if (edit) {
+      // 编辑模式：预填原日报内容
+      form.date = edit.date
+      form.time = edit.time || ''
+      form.content = (edit.tasks || []).map((t, i) => `${i + 1}. ${t}`).join('\n')
+      form.tags = [...(edit.tags || [])]
+    } else {
+      form.date = ui.reportModalDate || todayStr()
+      form.time = ''
+      form.content = ''
+      form.tags = []
+    }
   }
 )
 
@@ -97,7 +113,7 @@ function save() {
     .split('\n')
     .map((s) => s.replace(/^\d+[.、]\s*/, '').trim())
     .filter(Boolean)
-  reportStore.addReport({
+  const payload = {
     date: form.date,
     week: '星期' + weekCN[dt.getDay()],
     isToday: form.date === todayStr(),
@@ -105,8 +121,14 @@ function save() {
     title: tasks[0] || '未命名记录',
     tags: form.tags.length ? [...form.tags] : ['后端'],
     tasks
-  })
+  }
+  if (isEdit.value) {
+    reportStore.updateReport(ui.reportModalEdit.id, payload)
+    toast('日报已更新 ✔')
+  } else {
+    reportStore.addReport(payload)
+    toast('日报已保存 ✔')
+  }
   close()
-  toast('日报已保存 ✔')
 }
 </script>

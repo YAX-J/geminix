@@ -18,5 +18,11 @@ public interface IssueService {
     /** 仅切换状态 open <-> done */
     Issue toggleStatus(Long id, String status);
 
+    /** 切换收藏状态（常见问题置顶） */
+    Issue toggleFavorite(Long id);
+
     void deleteIssue(Long id);
+
+    /** 全部问题导出 Excel（xlsx 字节流） */
+    byte[] exportExcel();
 }

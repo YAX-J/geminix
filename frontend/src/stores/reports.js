@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { demoReports } from '@/mock/demoData'
-import { getReportList, createReport, deleteReport } from '@/api/reports'
+import { getReportList, createReport, updateReport, deleteReport } from '@/api/reports'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
@@ -27,7 +27,8 @@ export const useReportStore = defineStore('reports', {
         this.items = [...demoReports]
       } else {
         const page = await getReportList({ page: 1, size: 200 })
-        this.items = (page?.records || page || []).map((r) => ({ ...r, date: r.reportDate }))
+        // 后端字段 reportDate/timeRange -> 前端 date/time 模型
+        this.items = (page?.records || page || []).map((r) => ({ ...r, date: r.reportDate, time: r.timeRange }))
       }
       this.loaded = true
     },
@@ -56,6 +57,23 @@ export const useReportStore = defineStore('reports', {
       }
       await deleteReport(id)
       this.items = this.items.filter((r) => r.id !== id)
+    },
+
+    async updateReport(id, report) {
+      if (USE_MOCK) {
+        const idx = this.items.findIndex((r) => r.id === id)
+        if (idx >= 0) this.items[idx] = { ...this.items[idx], ...report }
+        return
+      }
+      const data = await updateReport(id, {
+        date: report.date,
+        timeRange: report.time,
+        title: report.title,
+        tasks: report.tasks,
+        tags: report.tags
+      })
+      const idx = this.items.findIndex((r) => r.id === id)
+      if (idx >= 0) this.items[idx] = { ...this.items[idx], ...data, date: data.reportDate }
     }
   }
 })

@@ -21,13 +21,23 @@
     </div>
 
     <div class="topbar-actions">
-      <button class="btn btn-ghost" @click="toast('周报导出功能开发中')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
-          <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-        </svg>
-        导出周报
-      </button>
+      <div class="export-drop">
+        <button class="btn btn-ghost" @click="exportOpen = !exportOpen">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12m0 0 4-4m-4 4-4-4" />
+            <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+          </svg>
+          导出
+          <span class="caret">▾</span>
+        </button>
+        <div v-if="exportOpen" class="drop-menu">
+          <div class="drop-item" @click="exportWeek">周报（Markdown）</div>
+          <div class="drop-item" @click="exportMonth">月报（Markdown）</div>
+          <div class="drop-item" @click="exportReports">日报 Excel</div>
+          <div class="drop-item" @click="exportIssues">问题 Excel</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost" @click="ui.openTagModal()">🏷 标签</button>
       <button class="btn btn-problem" @click="ui.openIssueModal()">⚠ 记录问题</button>
       <button class="btn btn-primary" @click="ui.openReportModal()">＋ 记录日报</button>
       <div class="user-box">
@@ -46,14 +56,125 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
+import { useReportStore } from '@/stores/reports'
+import { useIssueStore } from '@/stores/issues'
+import { exportWeekly, exportMonthly, exportReportsExcel } from '@/api/reports'
+import { exportIssuesExcel } from '@/api/issues'
 import { toast } from '@/utils/toast'
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 const router = useRouter()
 const ui = useUiStore()
 const auth = useAuthStore()
+const reportStore = useReportStore()
+const issueStore = useIssueStore()
 const searchInput = ref(null)
+const exportOpen = ref(false)
 
 const avatarText = computed(() => (auth.nickname || '用').slice(0, 1))
+
+function todayStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** 下载 Blob 文件 */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 导出本周 Markdown 周报 */
+async function exportWeek() {
+  try {
+    const date = todayStr()
+    const blob = await exportWeekly(date)
+    downloadBlob(blob, `worklog-week-${date}.md`)
+    toast('周报已导出 ✔')
+  } catch (e) {
+    toast(e.message || '导出失败')
+  }
+}
+
+/** 导出本月 Markdown 月报 */
+async function exportMonth() {
+  try {
+    const date = todayStr()
+    const blob = await exportMonthly(date)
+    downloadBlob(blob, `worklog-month-${date}.md`)
+    toast('月报已导出 ✔')
+  } catch (e) {
+    toast(e.message || '导出失败')
+  }
+}
+
+/** 日报导出：API 模式 xlsx，mock 模式 CSV */
+async function exportReports() {
+  if (USE_MOCK) {
+    await reportStore.load()
+    const rows = reportStore.items.map((r) => ({
+      日期: r.date,
+      星期: r.week || '',
+      时间段: r.time || '',
+      标题: r.title,
+      工作内容: (r.tasks || []).join('\n'),
+      标签: (r.tags || []).join(' / ')
+    }))
+    downloadCSV(rows, 'worklog-reports.csv')
+    toast('日报已导出 ✔')
+    return
+  }
+  try {
+    const blob = await exportReportsExcel()
+    downloadBlob(blob, 'worklog-reports.xlsx')
+    toast('日报 Excel 已导出 ✔')
+  } catch (e) {
+    toast(e.message || '导出失败')
+  }
+}
+
+/** 问题导出：API 模式 xlsx，mock 模式 CSV */
+async function exportIssues() {
+  if (USE_MOCK) {
+    await issueStore.load()
+    const rows = issueStore.items.map((i) => ({
+      问题标题: i.title,
+      问题描述: i.desc,
+      解决方案: i.solution || '',
+      标签: i.tag,
+      状态: i.status === 'done' ? '已解决' : '待解决',
+      关联日报: i.reportDate || '',
+      收藏: i.favorite ? '是' : '否'
+    }))
+    downloadCSV(rows, 'worklog-issues.csv')
+    toast('问题已导出 ✔')
+    return
+  }
+  try {
+    const blob = await exportIssuesExcel()
+    downloadBlob(blob, 'worklog-issues.xlsx')
+    toast('问题 Excel 已导出 ✔')
+  } catch (e) {
+    toast(e.message || '导出失败')
+  }
+}
+
+/** mock 模式 CSV 下载（带 BOM 保证 Excel 中文不乱码） */
+function downloadCSV(rows, filename) {
+  if (!rows.length) {
+    toast('暂无数据可导出')
+    return
+  }
+  const header = Object.keys(rows[0])
+  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const csv = [header.join(','), ...rows.map((r) => header.map((h) => esc(r[h])).join(','))].join('\n')
+  downloadBlob(new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }), filename)
+}
 
 function onLogout() {
   if (!window.confirm('确定退出登录？')) return
@@ -67,10 +188,21 @@ function onKeydown(e) {
     e.preventDefault()
     searchInput.value?.focus()
   }
+  if (e.key === 'Escape') exportOpen.value = false
 }
 
-onMounted(() => document.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
+function onDocClick(e) {
+  if (!e.target.closest('.export-drop')) exportOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', onKeydown)
+  document.addEventListener('click', onDocClick)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('click', onDocClick)
+})
 </script>
 
 <style scoped>
@@ -166,6 +298,41 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   gap: 10px;
   min-width: 300px;
   justify-content: flex-end;
+}
+.export-drop {
+  position: relative;
+}
+.caret {
+  font-size: 10px;
+  margin-left: 2px;
+  opacity: 0.7;
+}
+.drop-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 168px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+  padding: 6px;
+  z-index: 60;
+  animation: rise 0.18s ease both;
+}
+.drop-item {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 9px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.drop-item:hover {
+  background: var(--primary-bg);
+  color: var(--primary);
 }
 .avatar {
   width: 34px;

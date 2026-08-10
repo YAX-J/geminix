@@ -20,3 +20,18 @@ export function updateReport(id, data) {
 export function deleteReport(id) {
   return request.delete(`/reports/${id}`)
 }
+
+/** 周报导出（Markdown 文件下载，需登录） */
+export function exportWeekly(date) {
+  return request.get('/reports/export/weekly', { params: { date }, responseType: 'blob' })
+}
+
+/** 月报导出（Markdown 文件下载，需登录） */
+export function exportMonthly(date) {
+  return request.get('/reports/export/monthly', { params: { date }, responseType: 'blob' })
+}
+
+/** 日报 Excel 导出（xlsx 下载） */
+export function exportReportsExcel() {
+  return request.get('/reports/export/excel', { responseType: 'blob' })
+}

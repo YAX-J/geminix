@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { demoIssues } from '@/mock/demoData'
-import { getIssueList, createIssue, updateIssue, deleteIssue, toggleIssueStatus } from '@/api/issues'
+import { getIssueList, createIssue, updateIssue, deleteIssue, toggleIssueStatus, toggleIssueFavorite } from '@/api/issues'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
@@ -25,7 +25,8 @@ export const useIssueStore = defineStore('issues', {
         this.items = [...demoIssues]
       } else {
         const page = await getIssueList({ page: 1, size: 200 })
-        this.items = page?.records || page || []
+        // 后端字段 description -> 前端 desc 模型
+        this.items = (page?.records || page || []).map((i) => ({ ...i, desc: i.description }))
       }
       this.loaded = true
     },
@@ -35,8 +36,8 @@ export const useIssueStore = defineStore('issues', {
         this.items.unshift({ ...issue, id: Date.now() })
         return
       }
-      const data = await createIssue(issue)
-      this.items.unshift(data)
+      const data = await createIssue({ ...issue, description: issue.desc })
+      this.items.unshift({ ...data, desc: data.description })
     },
 
     async updateIssue(id, data) {
@@ -45,9 +46,9 @@ export const useIssueStore = defineStore('issues', {
         if (idx >= 0) this.items[idx] = { ...this.items[idx], ...data }
         return
       }
-      const updated = await updateIssue(id, data)
+      const updated = await updateIssue(id, { ...data, description: data.desc })
       const idx = this.items.findIndex((i) => i.id === id)
-      if (idx >= 0) this.items[idx] = updated
+      if (idx >= 0) this.items[idx] = { ...updated, desc: updated.description }
     },
 
     async toggleStatus(id) {
@@ -59,7 +60,19 @@ export const useIssueStore = defineStore('issues', {
       }
       const updated = await toggleIssueStatus(id)
       const idx = this.items.findIndex((i) => i.id === id)
-      if (idx >= 0) this.items[idx] = updated
+      if (idx >= 0) this.items[idx] = { ...updated, desc: updated.description }
+    },
+
+    async toggleFavorite(id) {
+      const it = this.items.find((i) => i.id === id)
+      if (!it) return
+      if (USE_MOCK) {
+        it.favorite = !it.favorite
+        return
+      }
+      const updated = await toggleIssueFavorite(id)
+      const idx = this.items.findIndex((i) => i.id === id)
+      if (idx >= 0) this.items[idx] = { ...updated, desc: updated.description }
     },
 
     async removeIssue(id) {

@@ -27,9 +27,12 @@
       <div class="stat-card"><div class="stat-num">{{ issueStore.openCount }}</div><div class="stat-label">待解决问题</div></div>
       <div class="stat-card"><div class="stat-num green">{{ issueStore.doneCount }}</div><div class="stat-label">已解决问题</div></div>
     </div>
+    <div v-if="streak > 0" class="streak-box">
+      🔥 已连续打卡 <b>{{ streak }}</b> 天
+    </div>
 
     <div class="divider"></div>
-    <div class="panel-title">日报标签筛选</div>
+    <div class="panel-title">日报标签筛选 <span class="link" @click="ui.openTagModal()">管理 ›</span></div>
     <div class="tag-list">
       <span
         v-for="f in filters"
@@ -43,27 +46,31 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useReportStore } from '@/stores/reports'
 import { useIssueStore } from '@/stores/issues'
 import { useUiStore } from '@/stores/ui'
+import { useTagStore } from '@/stores/tags'
+import { getStreak } from '@/api/stats'
 import { toast } from '@/utils/toast'
 import { weekCN } from '@/mock/demoData'
+
+const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 const router = useRouter()
 const reportStore = useReportStore()
 const issueStore = useIssueStore()
 const ui = useUiStore()
+const tagStore = useTagStore()
 
-const filters = [
+const streak = ref(0)
+
+/* 标签筛选：全部 + 动态标签 */
+const filters = computed(() => [
   { label: '全部', value: 'all' },
-  { label: '后端', value: '后端' },
-  { label: '前端', value: '前端' },
-  { label: '数据库', value: '数据库' },
-  { label: 'Redis', value: 'Redis' },
-  { label: '运维', value: '运维' }
-]
+  ...tagStore.names.map((n) => ({ label: n, value: n }))
+])
 
 function fmt(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -127,8 +134,32 @@ function onCellClick(cell) {
 }
 
 onMounted(async () => {
-  await Promise.all([reportStore.load(), issueStore.load()])
+  await Promise.all([reportStore.load(), issueStore.load(), tagStore.load()])
+  loadStreak()
 })
+
+/** 连续打卡天数：mock 本地计算，API 模式调接口 */
+function loadStreak() {
+  if (!USE_MOCK) {
+    getStreak()
+      .then((n) => {
+        streak.value = n || 0
+      })
+      .catch(() => {})
+    return
+  }
+  const dates = new Set(reportStore.items.map((r) => r.date))
+  const today = new Date()
+  const fmt = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  let cursor = dates.has(fmt(today)) ? today : new Date(today.getTime() - 86400000)
+  let n = 0
+  while (dates.has(fmt(cursor))) {
+    n++
+    cursor = new Date(cursor.getTime() - 86400000)
+  }
+  streak.value = n
+}
 </script>
 
 <style scoped>
@@ -253,6 +284,21 @@ onMounted(async () => {
   font-size: 11.5px;
   color: var(--text-2);
   margin-top: 3px;
+}
+.streak-box {
+  margin-top: 10px;
+  background: linear-gradient(90deg, #fff7ed, #fffbeb);
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: #92400e;
+  font-weight: 600;
+  text-align: center;
+}
+.streak-box b {
+  color: #ea580c;
+  font-size: 15px;
 }
 .tag-list {
   display: flex;

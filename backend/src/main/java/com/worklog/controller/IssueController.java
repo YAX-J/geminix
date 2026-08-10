@@ -7,6 +7,9 @@ import com.worklog.entity.Issue;
 import com.worklog.service.IssueService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -46,6 +49,24 @@ public class IssueController {
     @PatchMapping("/{id}/status")
     public R<Issue> toggleStatus(@PathVariable Long id, @RequestParam(required = false) String status) {
         return R.ok(issueService.toggleStatus(id, status));
+    }
+
+    /** 收藏切换（常见问题置顶） */
+    @PatchMapping("/{id}/favorite")
+    public R<Issue> toggleFavorite(@PathVariable Long id) {
+        return R.ok(issueService.toggleFavorite(id));
+    }
+
+    /** 问题 Excel 导出：/api/issues/export/excel */
+    @GetMapping("/export/excel")
+    public ResponseEntity<byte[]> exportExcel() {
+        byte[] bytes = issueService.exportExcel();
+        String filename = "worklog-issues.xlsx";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
     }
 
     @DeleteMapping("/{id}")

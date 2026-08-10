@@ -56,12 +56,19 @@ const statusFilters = [
 
 const filtered = computed(() => {
   const kw = ui.searchKw.trim().toLowerCase()
-  return issueStore.items.filter((i) => {
-    const txt = `${i.title} ${i.desc} ${i.solution || ''} ${i.tag} ${i.createdAt}`.toLowerCase()
-    const kwOk = !kw || txt.includes(kw)
-    const stOk = ui.issueFilter === 'all' || i.status === ui.issueFilter
-    return kwOk && stOk
-  })
+  return issueStore.items
+    .filter((i) => {
+      const txt = `${i.title} ${i.desc} ${i.solution || ''} ${i.tag} ${i.createdAt}`.toLowerCase()
+      const kwOk = !kw || txt.includes(kw)
+      const stOk = ui.issueFilter === 'all' || i.status === ui.issueFilter
+      return kwOk && stOk
+    })
+    .sort((a, b) => {
+      // 收藏（常见问题）置顶
+      const fa = a.favorite ? 1 : 0
+      const fb = b.favorite ? 1 : 0
+      return fb - fa
+    })
 })
 
 /* 从日报卡片跳转过来：定位并高亮目标问题 */

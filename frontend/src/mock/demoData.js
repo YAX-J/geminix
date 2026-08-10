@@ -68,12 +68,18 @@ export const demoReports = [
 ]
 
 // 问题：独立实体，status = open(待解决) | done(已解决)，reportDate 为可选的日报关联
+// solutions：多方案数组（content 内容 / best 是否最佳）；favorite：收藏置顶
 export const demoIssues = [
   {
     id: 1,
     title: 'Redis 缓存击穿导致慢查询',
     desc: '热点订单数据缓存击穿，瞬时高并发请求直接打到 MySQL，出现多条慢查询',
     solution: '本地缓存 + Redis 分布式锁双重兜底，缓存设置逻辑过期并异步刷新',
+    solutions: [
+      { content: '本地缓存 + Redis 分布式锁双重兜底，缓存设置逻辑过期并异步刷新', best: true },
+      { content: '热点 key 预生成 + 互斥重建，击穿窗口内只允许一个线程回源', best: false }
+    ],
+    favorite: true,
     tag: 'Redis',
     status: 'done',
     createdAt: '2026-08-10',
@@ -84,6 +90,8 @@ export const demoIssues = [
     title: '报表查询 N+1 导致接口超时',
     desc: '报表明细查询在循环中逐条查库，SQL 执行 200+ 次',
     solution: '关联查询 + 批量 IN 替代循环单查，SQL 次数降到 3 次',
+    solutions: [{ content: '关联查询 + 批量 IN 替代循环单查，SQL 次数降到 3 次', best: true }],
+    favorite: false,
     tag: '数据库',
     status: 'done',
     createdAt: '2026-08-07',
@@ -96,6 +104,7 @@ export const demoIssues = [
     solution: '虚拟滚动 + 分页加载，仅渲染可视区域，首屏 2.3s → 0.4s',
     tag: '前端',
     status: 'done',
+    favorite: false,
     createdAt: '2026-08-07',
     reportDate: '2026-08-07'
   },
@@ -106,6 +115,7 @@ export const demoIssues = [
     solution: '请求链路内 Token 只解析一次 + 黑名单机制，耗时降低 60%',
     tag: '后端',
     status: 'done',
+    favorite: false,
     createdAt: '2026-08-06',
     reportDate: '2026-08-06'
   },
@@ -116,6 +126,7 @@ export const demoIssues = [
     solution: '网关 CORS 白名单 + Vite/Nginx 代理转发',
     tag: '前端',
     status: 'done',
+    favorite: false,
     createdAt: '2026-08-05',
     reportDate: '2026-08-05'
   },
@@ -126,6 +137,7 @@ export const demoIssues = [
     solution: 'JVM 堆参数与容器限额对齐 + 健康检查自动重启',
     tag: '运维',
     status: 'done',
+    favorite: false,
     createdAt: '2026-08-04',
     reportDate: '2026-08-04'
   },
@@ -136,6 +148,7 @@ export const demoIssues = [
     solution: '',
     tag: '后端',
     status: 'open',
+    favorite: false,
     createdAt: '2026-08-10',
     reportDate: ''
   },
@@ -146,6 +159,7 @@ export const demoIssues = [
     solution: '',
     tag: '运维',
     status: 'open',
+    favorite: false,
     createdAt: '2026-08-07',
     reportDate: ''
   }

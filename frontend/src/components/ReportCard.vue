@@ -35,6 +35,7 @@
 <script setup>
 import { useRouter } from 'vue-router'
 import { useReportStore } from '@/stores/reports'
+import { useUiStore } from '@/stores/ui'
 import { toast } from '@/utils/toast'
 import { tagClassMap } from '@/mock/demoData'
 
@@ -45,13 +46,14 @@ const props = defineProps({
 
 const router = useRouter()
 const reportStore = useReportStore()
+const ui = useUiStore()
 
 function gotoIssue(id) {
   router.push({ path: '/issues', query: { focus: id } })
 }
 
 function onEdit() {
-  toast('日报编辑功能开发中')
+  ui.openEditReport(props.report)
 }
 
 function onDelete() {

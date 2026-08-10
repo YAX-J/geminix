@@ -21,3 +21,13 @@ export function deleteIssue(id) {
 export function toggleIssueStatus(id, status) {
   return request.patch(`/issues/${id}/status`, null, { params: { status } })
 }
+
+/** 收藏切换：常见问题置顶 */
+export function toggleIssueFavorite(id) {
+  return request.patch(`/issues/${id}/favorite`)
+}
+
+/** 问题 Excel 导出（xlsx 下载） */
+export function exportIssuesExcel() {
+  return request.get('/issues/export/excel', { responseType: 'blob' })
+}

@@ -1,6 +1,7 @@
 <template>
   <div class="app">
     <TopBar />
+    <ReminderBanner />
     <div class="main">
       <SidebarHeatmap />
       <!-- 中栏：日报 / 问题 双主视图（路由驱动） -->
@@ -11,13 +12,16 @@
       </main>
       <OverviewPanel />
     </div>
+    <TagManageModal />
   </div>
 </template>
 
 <script setup>
 import TopBar from '@/components/TopBar.vue'
+import ReminderBanner from '@/components/ReminderBanner.vue'
 import SidebarHeatmap from '@/components/SidebarHeatmap.vue'
 import OverviewPanel from '@/components/OverviewPanel.vue'
+import TagManageModal from '@/components/TagManageModal.vue'
 </script>
 
 <style scoped>

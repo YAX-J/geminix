@@ -104,6 +104,10 @@ textarea {
   color: var(--primary);
   border-color: var(--primary);
 }
+.btn.small {
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
 
 /* 标签 */
 .tag {

@@ -18,6 +18,15 @@ public interface StatsService {
     /** 高频问题类型 TOP N */
     List<StatsVO.HotTag> hotTags(int topN);
 
+    /** 问题类型全量分布（饼图数据） */
+    List<StatsVO.HotTag> issueDist();
+
+    /** 近 N 天问题新增/解决趋势（折线图数据） */
+    StatsVO.IssueTrend issueTrend(int days);
+
+    /** 连续打卡天数（streak）：今天已写从今天起算，未写则从昨天起算 */
+    int streak();
+
     /** 清除全部统计缓存（日报/问题写操作时调用） */
     void evictStats();
 }

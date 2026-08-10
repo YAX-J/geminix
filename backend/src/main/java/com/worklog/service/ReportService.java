@@ -18,4 +18,13 @@ public interface ReportService {
     Report updateReport(Long id, ReportReq req);
 
     void deleteReport(Long id);
+
+    /** 生成指定日期所在周的周报（Markdown 文本） */
+    String exportWeekly(java.time.LocalDate date);
+
+    /** 生成指定日期所在自然月的月报（Markdown 文本） */
+    String exportMonthly(java.time.LocalDate date);
+
+    /** 全部日报导出 Excel（xlsx 字节流） */
+    byte[] exportExcel();
 }

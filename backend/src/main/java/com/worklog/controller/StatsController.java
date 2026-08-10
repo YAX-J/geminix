@@ -41,4 +41,22 @@ public class StatsController {
     public R<List<StatsVO.HotTag>> hotTags(@RequestParam(defaultValue = "3") int topN) {
         return R.ok(statsService.hotTags(topN));
     }
+
+    /** 问题类型全量分布（饼图数据） */
+    @GetMapping("/issue-dist")
+    public R<List<StatsVO.HotTag>> issueDist() {
+        return R.ok(statsService.issueDist());
+    }
+
+    /** 问题趋势：近 N 天每日新增/解决（折线图数据） */
+    @GetMapping("/issue-trend")
+    public R<StatsVO.IssueTrend> issueTrend(@RequestParam(defaultValue = "14") int days) {
+        return R.ok(statsService.issueTrend(days));
+    }
+
+    /** 连续打卡天数（streak） */
+    @GetMapping("/streak")
+    public R<Integer> streak() {
+        return R.ok(statsService.streak());
+    }
 }
