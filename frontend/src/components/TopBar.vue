@@ -30,18 +30,37 @@
       </button>
       <button class="btn btn-problem" @click="ui.openIssueModal()">⚠ 记录问题</button>
       <button class="btn btn-primary" @click="ui.openReportModal()">＋ 记录日报</button>
-      <div class="avatar">陈</div>
+      <div class="user-box">
+        <div class="avatar">{{ avatarText }}</div>
+        <div class="user-meta">
+          <span class="user-name">{{ auth.nickname }}</span>
+          <button class="logout" @click="onLogout">退出登录</button>
+        </div>
+      </div>
     </div>
   </header>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { toast } from '@/utils/toast'
 
+const router = useRouter()
 const ui = useUiStore()
+const auth = useAuthStore()
 const searchInput = ref(null)
+
+const avatarText = computed(() => (auth.nickname || '用').slice(0, 1))
+
+function onLogout() {
+  if (!window.confirm('确定退出登录？')) return
+  auth.logout()
+  toast('已退出登录')
+  router.replace('/login')
+}
 
 function onKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -158,6 +177,34 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   place-items: center;
   font-weight: 700;
   font-size: 13px;
+  flex-shrink: 0;
+}
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.user-name {
+  font-size: 13px;
+  font-weight: 700;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logout {
+  font-size: 11px;
+  color: var(--text-3);
+  text-align: left;
+  transition: color 0.15s;
+}
+.logout:hover {
+  color: #dc2626;
 }
 
 @media (max-width: 700px) {

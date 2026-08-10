@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8089
 
 spring:
   application:
@@ -32,3 +32,11 @@ mybatis-plus:
 logging:
   level:
     com.worklog: debug
+
+# JWT 配置
+worklog:
+  jwt:
+    # HS256 密钥（生产环境务必更换并通过环境变量注入）
+    secret: worklog-jwt-secret-key-please-change-in-production-2026
+    # token 有效期（小时）
+    expire-hours: 24
