@@ -17,20 +17,25 @@
 所有容器（mysql/redis/backend/frontend）共享 worklog-net 网络，容器名即主机名
 ```
 
-文件清单：
+文件清单（**前后端已拆为两个仓库，需并排放置**，如 `/data/geminix` 与 `/data/geminix-front`）：
 
 ```
-D:\project\geminix
-├── docker-compose.yml         # 编排 backend + frontend
+/data/geminix                      # 后端仓库（本仓库）
+├── docker-compose.yml         # 编排 backend + frontend（frontend 构建上下文 = ../geminix-front）
 ├── .env.example                # 环境变量模板
-├── backend/
-│   ├── Dockerfile              # 多阶段：maven 编译 + JRE 21 运行
-│   └── .dockerignore
-└── frontend/
-    ├── Dockerfile              # 多阶段：node 构建 + nginx 静态托管
-    ├── nginx.conf              # 静态 + /api 反代
+└── backend/
+    ├── Dockerfile              # 多阶段：maven 编译（阿里云镜像）+ JRE 21 运行
+    ├── settings.xml            # Maven 阿里云镜像配置
     └── .dockerignore
+
+/data/geminix-front                 # 前端仓库（github.com/YAX-J/geminix-front）
+├── Dockerfile                 # 多阶段：node 构建（npmmirror 镜像）+ nginx 静态托管
+├── nginx.conf                 # 静态 + /api 反代
+└── .dockerignore
 ```
+
+> `worklog-net` 网络为 **external**（手工 `docker network create` 预创建，mysql/redis 手工加入），
+> compose 不托管该网络；删除网络前需先 `docker compose down`。
 
 ---
 

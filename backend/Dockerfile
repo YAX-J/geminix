@@ -9,6 +9,8 @@ WORKDIR /build
 
 # 先拷贝 pom.xml 并下载依赖（利用 Docker 层缓存：源码变更不重下依赖）
 COPY pom.xml .
+# 国内服务器走阿里云 Maven 镜像加速
+COPY settings.xml /root/.m2/settings.xml
 RUN mvn -B -ntp dependency:go-offline
 
 # 拷贝源码并打包

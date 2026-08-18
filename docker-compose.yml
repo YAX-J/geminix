@@ -49,7 +49,7 @@ services:
   # ---------- 前端：Vue + Nginx ----------
   frontend:
     build:
-      context: ./frontend
+      context: ../geminix-front
       dockerfile: Dockerfile
       args:
         # 容器内前端请求 /api（被 Nginx 反代到 backend:8089），不要改成绝对地址
@@ -72,5 +72,7 @@ services:
 
 networks:
   worklog-net:
-    driver: bridge
+    # 外部预创建的网络（mysql/redis 已手工 docker network connect 加入），
+    # compose 不托管，需先 docker network create worklog-net
+    external: true
     name: worklog-net
