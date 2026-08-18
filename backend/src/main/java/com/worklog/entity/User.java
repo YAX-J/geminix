@@ -24,6 +24,9 @@ public class User {
 
     private String nickname;
 
+    /** 角色：ADMIN 管理员 / AUTHOR 作者（可写）/ READER 只读 */
+    private String role;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;

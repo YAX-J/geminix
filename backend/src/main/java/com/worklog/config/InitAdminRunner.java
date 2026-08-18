@@ -22,15 +22,22 @@ public class InitAdminRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        Long exists = userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUsername, "admin"));
-        if (exists > 0) {
+        User existing = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, "admin"));
+        if (existing != null) {
+            // 存量 admin 若缺角色（升级场景），补设 ADMIN
+            if (existing.getRole() == null || existing.getRole().isEmpty()) {
+                existing.setRole("ADMIN");
+                userMapper.updateById(existing);
+                log.info("已为存量 admin 账号补设 ADMIN 角色");
+            }
             return;
         }
         User admin = new User();
         admin.setUsername("admin");
         admin.setPassword(passwordEncoder.encode("admin123"));
         admin.setNickname("管理员");
+        admin.setRole("ADMIN");
         userMapper.insert(admin);
-        log.info("已创建默认账号 admin / admin123");
+        log.info("已创建默认账号 admin / admin123（ADMIN）");
     }
 }

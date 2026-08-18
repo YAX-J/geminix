@@ -2,6 +2,7 @@ package com.worklog.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.worklog.common.R;
+import com.worklog.config.RequireRole;
 import com.worklog.dto.IssueReq;
 import com.worklog.entity.Issue;
 import com.worklog.service.IssueService;
@@ -36,23 +37,27 @@ public class IssueController {
     }
 
     @PostMapping
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Issue> add(@Valid @RequestBody IssueReq req) {
         return R.ok(issueService.addIssue(req));
     }
 
     @PutMapping("/{id}")
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Issue> update(@PathVariable Long id, @Valid @RequestBody IssueReq req) {
         return R.ok(issueService.updateIssue(id, req));
     }
 
     /** 状态切换（标记已解决 / 重新打开），不传 status 时自动取反 */
     @PatchMapping("/{id}/status")
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Issue> toggleStatus(@PathVariable Long id, @RequestParam(required = false) String status) {
         return R.ok(issueService.toggleStatus(id, status));
     }
 
     /** 收藏切换（常见问题置顶） */
     @PatchMapping("/{id}/favorite")
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Issue> toggleFavorite(@PathVariable Long id) {
         return R.ok(issueService.toggleFavorite(id));
     }
@@ -70,6 +75,7 @@ public class IssueController {
     }
 
     @DeleteMapping("/{id}")
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Void> delete(@PathVariable Long id) {
         issueService.deleteIssue(id);
         return R.ok();

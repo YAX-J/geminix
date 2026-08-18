@@ -45,6 +45,9 @@ public class AuthServiceImpl implements AuthService {
         user.setUsername(req.getUsername());
         user.setPassword(passwordEncoder.encode(req.getPassword()));
         user.setNickname(StringUtils.hasText(req.getNickname()) ? req.getNickname() : req.getUsername());
+        // 开放注册仅允许 AUTHOR / READER，默认 AUTHOR；ADMIN 不可自注册
+        String role = StringUtils.hasText(req.getRole()) ? req.getRole() : "AUTHOR";
+        user.setRole("READER".equals(role) ? "READER" : "AUTHOR");
         userMapper.insert(user);
         return buildLoginVO(user);
     }
@@ -114,11 +117,11 @@ public class AuthServiceImpl implements AuthService {
         if (user == null) {
             throw new BusinessException(401, "用户不存在或已失效");
         }
-        return UserVO.of(user.getId(), user.getUsername(), user.getNickname());
+        return UserVO.of(user.getId(), user.getUsername(), user.getNickname(), user.getRole());
     }
 
     private LoginVO buildLoginVO(User user) {
         String token = jwtUtil.generate(user.getId(), user.getUsername());
-        return new LoginVO(token, UserVO.of(user.getId(), user.getUsername(), user.getNickname()));
+        return new LoginVO(token, UserVO.of(user.getId(), user.getUsername(), user.getNickname(), user.getRole()));
     }
 }

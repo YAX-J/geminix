@@ -21,4 +21,8 @@ public class RegisterReq {
 
     @Size(max = 20, message = "昵称最长 20 字")
     private String nickname;
+
+    /** 注册角色：AUTHOR（默认，可写）/ READER（只读）；ADMIN 不可通过注册获得 */
+    @Pattern(regexp = "^(AUTHOR|READER)$", message = "角色仅支持 AUTHOR 或 READER")
+    private String role;
 }

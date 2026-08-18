@@ -2,6 +2,7 @@ package com.worklog.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.worklog.common.R;
+import com.worklog.config.RequireRole;
 import com.worklog.dto.ReportReq;
 import com.worklog.entity.Report;
 import com.worklog.service.ReportService;
@@ -40,16 +41,19 @@ public class ReportController {
     }
 
     @PostMapping
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Report> add(@Valid @RequestBody ReportReq req) {
         return R.ok(reportService.addReport(req));
     }
 
     @PutMapping("/{id}")
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Report> update(@PathVariable Long id, @Valid @RequestBody ReportReq req) {
         return R.ok(reportService.updateReport(id, req));
     }
 
     @DeleteMapping("/{id}")
+    @RequireRole({"ADMIN", "AUTHOR"})
     public R<Void> delete(@PathVariable Long id) {
         reportService.deleteReport(id);
         return R.ok();
