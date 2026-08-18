@@ -4,6 +4,7 @@ import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.worklog.common.BusinessException;
+import com.worklog.common.UserContext;
 import com.worklog.dto.IssueExcelRow;
 import com.worklog.dto.IssueReq;
 import com.worklog.entity.Issue;
@@ -31,6 +32,7 @@ public class IssueServiceImpl implements IssueService {
     @Override
     public Page<Issue> getIssues(String status, String keyword, String tag, long page, long size) {
         LambdaQueryWrapper<Issue> qw = new LambdaQueryWrapper<>();
+        qw.eq(Issue::getUserId, UserContext.require());
         if (StringUtils.hasText(status)) {
             qw.eq(Issue::getStatus, status);
         }
@@ -50,7 +52,9 @@ public class IssueServiceImpl implements IssueService {
 
     @Override
     public Issue getIssue(Long id) {
-        Issue issue = issueMapper.selectById(id);
+        Issue issue = issueMapper.selectOne(new LambdaQueryWrapper<Issue>()
+                .eq(Issue::getId, id)
+                .eq(Issue::getUserId, UserContext.require()));
         if (issue == null) {
             throw new BusinessException(404, "问题不存在");
         }
@@ -60,6 +64,7 @@ public class IssueServiceImpl implements IssueService {
     @Override
     public Issue addIssue(IssueReq req) {
         Issue issue = new Issue();
+        issue.setUserId(UserContext.require());
         issue.setTitle(req.getTitle());
         issue.setDescription(req.getDescription());
         issue.setTag(StringUtils.hasText(req.getTag()) ? req.getTag() : "后端");
@@ -130,6 +135,7 @@ public class IssueServiceImpl implements IssueService {
     @Override
     public byte[] exportExcel() {
         List<Issue> issues = issueMapper.selectList(new LambdaQueryWrapper<Issue>()
+                .eq(Issue::getUserId, UserContext.require())
                 .orderByDesc(Issue::getCreatedAt).orderByDesc(Issue::getId));
         DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
         List<IssueExcelRow> rows = issues.stream().map(i -> {

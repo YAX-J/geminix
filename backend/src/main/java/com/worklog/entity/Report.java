@@ -21,6 +21,9 @@ public class Report {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 所属用户（数据隔离） */
+    private Long userId;
+
     private LocalDate reportDate;
 
     /** 星期（冗余存储，查询展示用） */

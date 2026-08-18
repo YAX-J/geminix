@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.worklog.common.UserContext;
 import com.worklog.dto.StatsVO;
 import com.worklog.entity.Issue;
 import com.worklog.entity.Report;
@@ -22,13 +23,14 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 统计服务：查询结果缓存于 Redis，写操作由 Report/Issue 服务触发失效
+ * 统计服务：查询结果缓存于 Redis，写操作由 Report/Issue 服务触发失效。
+ * 多用户改造后：所有查询按 user_id 隔离，缓存键带 userId 后缀防止串数据。
  *
- * 缓存键设计：
- *   worklog:stats:overview        概览统计      TTL 5min
- *   worklog:stats:heatmap:{year}  年度热力图    TTL 12h
- *   worklog:stats:weekly          本周分布      TTL 1h
- *   worklog:stats:hot-tags        高频标签      TTL 1h
+ * 缓存键设计（{uid} = 当前用户 id）：
+ *   worklog:stats:overview:{uid}          概览统计      TTL 5min
+ *   worklog:stats:heatmap:{year}:{uid}    年度热力图    TTL 12h
+ *   worklog:stats:weekly:{uid}            本周分布      TTL 1h
+ *   worklog:stats:hot-tags:{uid}          高频标签      TTL 1h
  */
 @Slf4j
 @Service
@@ -51,7 +53,8 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public StatsVO.Overview overview() {
-        String cached = redisTemplate.opsForValue().get(KEY_OVERVIEW);
+        String key = KEY_OVERVIEW + ":" + uid();
+        String cached = redisTemplate.opsForValue().get(key);
         if (StringUtils.hasText(cached)) {
             try {
                 return objectMapper.readValue(cached, StatsVO.Overview.class);
@@ -61,7 +64,7 @@ public class StatsServiceImpl implements StatsService {
         }
         StatsVO.Overview vo = buildOverview();
         try {
-            redisTemplate.opsForValue().set(KEY_OVERVIEW, objectMapper.writeValueAsString(vo), 5, TimeUnit.MINUTES);
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(vo), 5, TimeUnit.MINUTES);
         } catch (JsonProcessingException e) {
             log.warn("overview 缓存序列化失败: {}", e.getMessage());
         }
@@ -70,7 +73,7 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public StatsVO.Heatmap heatmap(int year) {
-        String key = KEY_HEATMAP_PREFIX + year;
+        String key = KEY_HEATMAP_PREFIX + year + ":" + uid();
         String cached = redisTemplate.opsForValue().get(key);
         if (StringUtils.hasText(cached)) {
             try {
@@ -90,7 +93,8 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public StatsVO.Weekly weekly() {
-        String cached = redisTemplate.opsForValue().get(KEY_WEEKLY);
+        String key = KEY_WEEKLY + ":" + uid();
+        String cached = redisTemplate.opsForValue().get(key);
         if (StringUtils.hasText(cached)) {
             try {
                 return objectMapper.readValue(cached, StatsVO.Weekly.class);
@@ -100,7 +104,7 @@ public class StatsServiceImpl implements StatsService {
         }
         StatsVO.Weekly vo = buildWeekly();
         try {
-            redisTemplate.opsForValue().set(KEY_WEEKLY, objectMapper.writeValueAsString(vo), 1, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(vo), 1, TimeUnit.HOURS);
         } catch (JsonProcessingException e) {
             log.warn("weekly 缓存序列化失败: {}", e.getMessage());
         }
@@ -109,7 +113,8 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public List<StatsVO.HotTag> hotTags(int topN) {
-        String cached = redisTemplate.opsForValue().get(KEY_HOT_TAGS);
+        String key = KEY_HOT_TAGS + ":" + uid();
+        String cached = redisTemplate.opsForValue().get(key);
         if (StringUtils.hasText(cached)) {
             try {
                 return objectMapper.readValue(cached,
@@ -120,7 +125,7 @@ public class StatsServiceImpl implements StatsService {
         }
         List<StatsVO.HotTag> vo = buildHotTags(topN);
         try {
-            redisTemplate.opsForValue().set(KEY_HOT_TAGS, objectMapper.writeValueAsString(vo), 1, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(vo), 1, TimeUnit.HOURS);
         } catch (JsonProcessingException e) {
             log.warn("hot-tags 缓存序列化失败: {}", e.getMessage());
         }
@@ -129,12 +134,15 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public void evictStats() {
-        Set<String> keys = redisTemplate.keys(KEY_OVERVIEW);
-        keys.addAll(redisTemplate.keys(KEY_HEATMAP_PREFIX + "*"));
-        keys.add(KEY_WEEKLY);
-        keys.add(KEY_HOT_TAGS);
-        keys.add(KEY_ISSUE_DIST);
-        keys.addAll(redisTemplate.keys(KEY_ISSUE_TREND_PREFIX + "*"));
+        Long u = UserContext.get();
+        Set<String> keys = new HashSet<>();
+        String suffix = u == null ? "" : ":" + u;
+        keys.add(KEY_OVERVIEW + suffix);
+        keys.add(KEY_WEEKLY + suffix);
+        keys.add(KEY_HOT_TAGS + suffix);
+        keys.add(KEY_ISSUE_DIST + suffix);
+        keys.addAll(redisTemplate.keys(KEY_HEATMAP_PREFIX + "*" + suffix));
+        keys.addAll(redisTemplate.keys(KEY_ISSUE_TREND_PREFIX + "*" + suffix));
         if (!keys.isEmpty()) {
             redisTemplate.delete(keys);
         }
@@ -142,7 +150,8 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public List<StatsVO.HotTag> issueDist() {
-        String cached = redisTemplate.opsForValue().get(KEY_ISSUE_DIST);
+        String key = KEY_ISSUE_DIST + ":" + uid();
+        String cached = redisTemplate.opsForValue().get(key);
         if (StringUtils.hasText(cached)) {
             try {
                 return objectMapper.readValue(cached,
@@ -153,6 +162,7 @@ public class StatsServiceImpl implements StatsService {
         }
         QueryWrapper<Issue> qw = new QueryWrapper<>();
         qw.select("tag", "COUNT(*) AS cnt")
+          .eq("user_id", uid())
           .groupBy("tag")
           .orderByDesc("cnt");
         List<Map<String, Object>> rows = issueMapper.selectMaps(qw);
@@ -164,7 +174,7 @@ public class StatsServiceImpl implements StatsService {
             list.add(ht);
         }
         try {
-            redisTemplate.opsForValue().set(KEY_ISSUE_DIST, objectMapper.writeValueAsString(list), 1, TimeUnit.HOURS);
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(list), 1, TimeUnit.HOURS);
         } catch (JsonProcessingException e) {
             log.warn("issue-dist 缓存序列化失败: {}", e.getMessage());
         }
@@ -174,7 +184,7 @@ public class StatsServiceImpl implements StatsService {
     @Override
     public StatsVO.IssueTrend issueTrend(int days) {
         int n = Math.min(Math.max(days, 7), 90);
-        String key = KEY_ISSUE_TREND_PREFIX + n;
+        String key = KEY_ISSUE_TREND_PREFIX + n + ":" + uid();
         String cached = redisTemplate.opsForValue().get(key);
         if (StringUtils.hasText(cached)) {
             try {
@@ -217,7 +227,8 @@ public class StatsServiceImpl implements StatsService {
     @Override
     public int streak() {
         List<Report> reports = reportMapper.selectList(new LambdaQueryWrapper<Report>()
-                .select(Report::getReportDate));
+                .select(Report::getReportDate)
+                .eq(Report::getUserId, uid()));
         Set<String> dates = new HashSet<>();
         for (Report r : reports) {
             if (r.getReportDate() != null) {
@@ -245,6 +256,7 @@ public class StatsServiceImpl implements StatsService {
                                          String column, LocalDate from, String status) {
         QueryWrapper<Issue> qw = new QueryWrapper<>();
         qw.select("DATE(" + column + ") AS d", "COUNT(*) AS cnt")
+          .eq("user_id", uid())
           .ge(column, from.atStartOfDay())
           .groupBy("DATE(" + column + ")");
         if (StringUtils.hasText(status)) {
@@ -267,13 +279,17 @@ public class StatsServiceImpl implements StatsService {
 
     private StatsVO.Overview buildOverview() {
         StatsVO.Overview vo = new StatsVO.Overview();
-        vo.setReportTotal(reportMapper.selectCount(null));
+        vo.setReportTotal(reportMapper.selectCount(new LambdaQueryWrapper<Report>()
+                .eq(Report::getUserId, uid())));
         LocalDate now = LocalDate.now();
         vo.setReportMonth(reportMapper.selectCount(new LambdaQueryWrapper<Report>()
+                .eq(Report::getUserId, uid())
                 .ge(Report::getReportDate, now.withDayOfMonth(1))
                 .le(Report::getReportDate, now)));
-        long open = issueMapper.selectCount(new LambdaQueryWrapper<Issue>().eq(Issue::getStatus, "open"));
-        long done = issueMapper.selectCount(new LambdaQueryWrapper<Issue>().eq(Issue::getStatus, "done"));
+        long open = issueMapper.selectCount(new LambdaQueryWrapper<Issue>()
+                .eq(Issue::getUserId, uid()).eq(Issue::getStatus, "open"));
+        long done = issueMapper.selectCount(new LambdaQueryWrapper<Issue>()
+                .eq(Issue::getUserId, uid()).eq(Issue::getStatus, "done"));
         vo.setIssueOpen(open);
         vo.setIssueDone(done);
         long total = open + done;
@@ -284,6 +300,7 @@ public class StatsServiceImpl implements StatsService {
     private StatsVO.Heatmap buildHeatmap(int year) {
         QueryWrapper<Report> qw = new QueryWrapper<>();
         qw.select("report_date", "COUNT(*) AS cnt")
+          .eq("user_id", uid())
           .apply("YEAR(report_date) = {0}", year)
           .groupBy("report_date");
         List<Map<String, Object>> rows = reportMapper.selectMaps(qw);
@@ -307,6 +324,7 @@ public class StatsServiceImpl implements StatsService {
         LocalDate monday = today.minusDays((today.getDayOfWeek().getValue() + 6) % 7);
         QueryWrapper<Report> qw = new QueryWrapper<>();
         qw.select("report_date", "COUNT(*) AS cnt")
+          .eq("user_id", uid())
           .between("report_date", monday, monday.plusDays(6))
           .groupBy("report_date");
         List<Map<String, Object>> rows = reportMapper.selectMaps(qw);
@@ -335,6 +353,7 @@ public class StatsServiceImpl implements StatsService {
     private List<StatsVO.HotTag> buildHotTags(int topN) {
         QueryWrapper<Issue> qw = new QueryWrapper<>();
         qw.select("tag", "COUNT(*) AS cnt")
+          .eq("user_id", uid())
           .groupBy("tag")
           .orderByDesc("cnt")
           .last("LIMIT " + topN);
@@ -347,5 +366,10 @@ public class StatsServiceImpl implements StatsService {
             list.add(ht);
         }
         return list;
+    }
+
+    /** 当前用户 id（字符串形式，用于缓存键与 SQL 过滤） */
+    private String uid() {
+        return String.valueOf(UserContext.require());
     }
 }

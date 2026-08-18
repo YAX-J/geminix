@@ -21,6 +21,9 @@ public class Issue {
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /** 所属用户（数据隔离） */
+    private Long userId;
+
     private String title;
 
     private String description;

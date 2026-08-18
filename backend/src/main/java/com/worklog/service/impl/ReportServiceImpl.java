@@ -4,6 +4,7 @@ import com.alibaba.excel.EasyExcel;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.worklog.common.BusinessException;
+import com.worklog.common.UserContext;
 import com.worklog.dto.ReportExcelRow;
 import com.worklog.dto.ReportReq;
 import com.worklog.entity.Issue;
@@ -41,6 +42,7 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public Page<Report> getReports(LocalDate date, String keyword, String tag, long page, long size) {
         LambdaQueryWrapper<Report> qw = new LambdaQueryWrapper<>();
+        qw.eq(Report::getUserId, UserContext.require());
         if (date != null) {
             qw.eq(Report::getReportDate, date);
         }
@@ -59,7 +61,9 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     public Report getReport(Long id) {
-        Report report = reportMapper.selectById(id);
+        Report report = reportMapper.selectOne(new LambdaQueryWrapper<Report>()
+                .eq(Report::getId, id)
+                .eq(Report::getUserId, UserContext.require()));
         if (report == null) {
             throw new BusinessException(404, "日报不存在");
         }
@@ -69,6 +73,7 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public Report addReport(ReportReq req) {
         Report report = new Report();
+        report.setUserId(UserContext.require());
         copyProps(report, req);
         reportMapper.insert(report);
         statsService.evictStats();
@@ -108,12 +113,14 @@ public class ReportServiceImpl implements ReportService {
         LocalDate sunday = monday.plusDays(6);
 
         List<Report> reports = reportMapper.selectList(new LambdaQueryWrapper<Report>()
+                .eq(Report::getUserId, UserContext.require())
                 .between(Report::getReportDate, monday, sunday)
                 .orderByAsc(Report::getReportDate));
 
         LocalDateTime weekStart = monday.atStartOfDay();
         LocalDateTime weekEnd = sunday.plusDays(1).atStartOfDay();
         List<Issue> issues = issueMapper.selectList(new LambdaQueryWrapper<Issue>()
+                .eq(Issue::getUserId, UserContext.require())
                 .ge(Issue::getCreatedAt, weekStart)
                 .lt(Issue::getCreatedAt, weekEnd)
                 .orderByAsc(Issue::getCreatedAt));
@@ -174,9 +181,11 @@ public class ReportServiceImpl implements ReportService {
         LocalDate last = ym.atEndOfMonth();
 
         List<Report> reports = reportMapper.selectList(new LambdaQueryWrapper<Report>()
+                .eq(Report::getUserId, UserContext.require())
                 .between(Report::getReportDate, first, last)
                 .orderByAsc(Report::getReportDate));
         List<Issue> issues = issueMapper.selectList(new LambdaQueryWrapper<Issue>()
+                .eq(Issue::getUserId, UserContext.require())
                 .ge(Issue::getCreatedAt, first.atStartOfDay())
                 .lt(Issue::getCreatedAt, last.plusDays(1).atStartOfDay())
                 .orderByAsc(Issue::getCreatedAt));
@@ -238,6 +247,7 @@ public class ReportServiceImpl implements ReportService {
     @Override
     public byte[] exportExcel() {
         List<Report> reports = reportMapper.selectList(new LambdaQueryWrapper<Report>()
+                .eq(Report::getUserId, UserContext.require())
                 .orderByDesc(Report::getReportDate).orderByDesc(Report::getId));
         DateTimeFormatter df = DateTimeFormatter.ofPattern("yyyy-MM-dd");
         List<ReportExcelRow> rows = reports.stream().map(r -> {

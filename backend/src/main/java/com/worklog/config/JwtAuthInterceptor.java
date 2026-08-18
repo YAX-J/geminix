@@ -2,6 +2,7 @@ package com.worklog.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.worklog.common.R;
+import com.worklog.common.UserContext;
 import com.worklog.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,11 +39,18 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
             Long userId = claims == null ? null : jwtUtil.getUserId(claims);
             if (userId != null) {
                 request.setAttribute(USER_ID_ATTR, userId);
+                UserContext.set(userId);
                 return true;
             }
         }
         writeUnauthorized(response);
         return false;
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        // 请求结束清理线程上下文，防止线程复用导致 userId 串号
+        UserContext.clear();
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws Exception {
