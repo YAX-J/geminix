@@ -63,7 +63,7 @@ EXIT;
 > `GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION; FLUSH PRIVILEGES;`
 > 但 root 开放网络权限是安全大忌，**生产环境务必用 worklog 专用账号**。
 
-### 1.2 导入表结构与演示数据
+### 1.2 导入表结构（演示数据已清空）
 
 `backend/sql/init.sql` 脚本顶部已 `SET NAMES utf8mb4` 兜底，**推荐用容器内 mysql 客户端执行**（避免宿主机 socket 缺失）：
 
@@ -72,6 +72,9 @@ EXIT;
 docker exec -i mysql mysql -uroot -p < backend/sql/init.sql
 
 # 方式 2：若报单包超限（max_allowed_packet），使用拆分版脚本
+# ⚠️ 注意：backend/sql/scripts/ 拆分脚本为旧版（2026-08-10），
+#    不含多用户字段（user_id / role）且含演示数据，与 init.sql 已不同步。
+#    多用户环境请勿直接执行，需先从 init.sql 重新生成拆分脚本后再用。
 cd backend/sql/scripts
 for f in 01_*.sql 02_*.sql 03_*.sql 04_*.sql 05_*.sql 06_*.sql 07_*.sql; do
   docker exec -i mysql mysql -uroot -p < "$f"
