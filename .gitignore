@@ -15,6 +15,11 @@ frontend/dist/
 frontend/dist_old_*/
 frontend/*.timestamp-*.mjs
 
+# ai-service（Python 向量服务）
+ai-service/.venv/
+ai-service/**/__pycache__/
+ai-service/models/
+
 # 环境变量（本地敏感配置）
 .env.local
 .env.*.local
