@@ -20,15 +20,16 @@ public class IssueController {
 
     private final IssueService issueService;
 
-    /** 问题列表：支持 status / keyword / tag 过滤 */
+    /** 问题列表：支持 status / keyword / tag / project 过滤 */
     @GetMapping
     public R<Page<Issue>> list(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String project,
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size) {
-        return R.ok(issueService.getIssues(status, keyword, tag, page, size));
+        return R.ok(issueService.getIssues(status, keyword, tag, project, page, size));
     }
 
     @GetMapping("/{id}")

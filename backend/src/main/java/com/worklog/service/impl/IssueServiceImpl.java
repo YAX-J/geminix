@@ -30,7 +30,7 @@ public class IssueServiceImpl implements IssueService {
     private static final List<String> VALID_STATUS = List.of("open", "done");
 
     @Override
-    public Page<Issue> getIssues(String status, String keyword, String tag, long page, long size) {
+    public Page<Issue> getIssues(String status, String keyword, String tag, String project, long page, long size) {
         LambdaQueryWrapper<Issue> qw = new LambdaQueryWrapper<>();
         qw.eq(Issue::getUserId, UserContext.require());
         if (StringUtils.hasText(status)) {
@@ -44,6 +44,9 @@ public class IssueServiceImpl implements IssueService {
         }
         if (StringUtils.hasText(tag)) {
             qw.eq(Issue::getTag, tag.trim());
+        }
+        if (StringUtils.hasText(project)) {
+            qw.eq(Issue::getProject, project.trim());
         }
         // 常见问题（收藏）置顶，其次最新创建
         qw.orderByDesc(Issue::getFavorite).orderByDesc(Issue::getCreatedAt).orderByDesc(Issue::getId);
@@ -69,6 +72,7 @@ public class IssueServiceImpl implements IssueService {
         issue.setDescription(req.getDescription());
         issue.setTag(StringUtils.hasText(req.getTag()) ? req.getTag() : "后端");
         issue.setReportDate(req.getReportDate());
+        issue.setProject(req.getProject());
         issue.setFavorite(Boolean.TRUE.equals(req.getFavorite()));
         applySolutions(issue, req);
         // 有方案（solution 或 solutions 非空）且未指定状态 -> 自动已解决
@@ -92,6 +96,7 @@ public class IssueServiceImpl implements IssueService {
             exist.setTag(req.getTag());
         }
         exist.setReportDate(req.getReportDate());
+        exist.setProject(req.getProject());
         if (req.getFavorite() != null) {
             exist.setFavorite(req.getFavorite());
         }

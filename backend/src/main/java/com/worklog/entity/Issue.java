@@ -39,6 +39,9 @@ public class Issue {
     /** 关联日报日期：可空 = 独立问题 */
     private LocalDate reportDate;
 
+    /** 所属项目（可空 = 未分类） */
+    private String project;
+
     /** 多个解决方案（JSON 数组，元素 {content, best}），最佳方案标记 best=true */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<IssueSolution> solutions;

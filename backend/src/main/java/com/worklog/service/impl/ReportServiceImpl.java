@@ -40,7 +40,7 @@ public class ReportServiceImpl implements ReportService {
     private static final String[] WEEK_CN = {"", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"};
 
     @Override
-    public Page<Report> getReports(LocalDate date, String keyword, String tag, long page, long size) {
+    public Page<Report> getReports(LocalDate date, String keyword, String tag, String project, long page, long size) {
         LambdaQueryWrapper<Report> qw = new LambdaQueryWrapper<>();
         qw.eq(Report::getUserId, UserContext.require());
         if (date != null) {
@@ -54,6 +54,9 @@ public class ReportServiceImpl implements ReportService {
         }
         if (StringUtils.hasText(tag)) {
             qw.like(Report::getTags, "\"" + tag.trim() + "\"");
+        }
+        if (StringUtils.hasText(project)) {
+            qw.eq(Report::getProject, project.trim());
         }
         qw.orderByDesc(Report::getReportDate).orderByDesc(Report::getId);
         return reportMapper.selectPage(new Page<>(page, size), qw);
@@ -105,6 +108,7 @@ public class ReportServiceImpl implements ReportService {
         report.setTitle(req.getTitle());
         report.setTasks(req.getTasks());
         report.setTags(req.getTags() == null || req.getTags().isEmpty() ? List.of("后端") : req.getTags());
+        report.setProject(req.getProject());
     }
 
     @Override
@@ -143,6 +147,9 @@ public class ReportServiceImpl implements ReportService {
             sb.append("### ").append(d.format(df)).append(" ").append(weekCn(d.getDayOfWeek())).append("\n\n");
             for (Report r : e.getValue()) {
                 sb.append("- **").append(r.getTitle()).append("**");
+                if (StringUtils.hasText(r.getProject())) {
+                    sb.append(" `[").append(r.getProject()).append("]`");
+                }
                 if (StringUtils.hasText(r.getTimeRange())) {
                     sb.append("（").append(r.getTimeRange()).append("）");
                 }
@@ -209,6 +216,9 @@ public class ReportServiceImpl implements ReportService {
             sb.append("### ").append(d.format(df)).append(" ").append(weekCn(d.getDayOfWeek())).append("\n\n");
             for (Report r : e.getValue()) {
                 sb.append("- **").append(r.getTitle()).append("**");
+                if (StringUtils.hasText(r.getProject())) {
+                    sb.append(" `[").append(r.getProject()).append("]`");
+                }
                 if (StringUtils.hasText(r.getTimeRange())) {
                     sb.append("（").append(r.getTimeRange()).append("）");
                 }

@@ -24,15 +24,16 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    /** 日报列表：支持 date / keyword / tag 过滤，默认分页 page=1 size=20 */
+    /** 日报列表：支持 date / keyword / tag / project 过滤，默认分页 page=1 size=20 */
     @GetMapping
     public R<Page<Report>> list(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String tag,
+            @RequestParam(required = false) String project,
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "20") long size) {
-        return R.ok(reportService.getReports(date, keyword, tag, page, size));
+        return R.ok(reportService.getReports(date, keyword, tag, project, page, size));
     }
 
     @GetMapping("/{id}")

@@ -6,8 +6,8 @@ import com.worklog.entity.Issue;
 
 public interface IssueService {
 
-    /** 分页查询：支持按状态 / 关键词 / 标签过滤 */
-    Page<Issue> getIssues(String status, String keyword, String tag, long page, long size);
+    /** 分页查询：支持按状态 / 关键词 / 标签 / 项目过滤 */
+    Page<Issue> getIssues(String status, String keyword, String tag, String project, long page, long size);
 
     Issue getIssue(Long id);
 

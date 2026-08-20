@@ -26,4 +26,7 @@ public class ReportReq {
     private List<String> tasks;
 
     private List<String> tags;
+
+    /** 所属项目（可空 = 未分类） */
+    private String project;
 }

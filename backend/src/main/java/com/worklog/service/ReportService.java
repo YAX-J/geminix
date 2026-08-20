@@ -8,8 +8,8 @@ import java.time.LocalDate;
 
 public interface ReportService {
 
-    /** 分页查询：支持按日期 / 关键词 / 标签过滤，按日期倒序 */
-    Page<Report> getReports(LocalDate date, String keyword, String tag, long page, long size);
+    /** 分页查询：支持按日期 / 关键词 / 标签 / 项目过滤，按日期倒序 */
+    Page<Report> getReports(LocalDate date, String keyword, String tag, String project, long page, long size);
 
     Report getReport(Long id);
 

@@ -1,5 +1,5 @@
 server:
-  port: 8089
+  port: 9000
 
 spring:
   application:
@@ -7,14 +7,16 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     # 生产环境可用环境变量覆盖：DB_URL / DB_USERNAME / DB_PASSWORD
-    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:123456}
+    url: ${DB_URL:jdbc:mysql://121.199.172.128:3306/worklog?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:worklog}
+    # 密码不写默认值，本地/部署用 DB_PASSWORD 环境变量注入
+    password: ${DB_PASSWORD:}
   data:
     redis:
       # 生产环境可用环境变量覆盖：REDIS_HOST / REDIS_PORT / REDIS_PASSWORD
-      host: ${REDIS_HOST:127.0.0.1}
+      host: ${REDIS_HOST:121.199.172.128}
       port: ${REDIS_PORT:6379}
+      # 密码不写默认值，本地/部署用 REDIS_PASSWORD 环境变量注入
       password: ${REDIS_PASSWORD:}
       timeout: 3s
   jackson:

@@ -30,6 +30,9 @@ public class IssueReq {
     /** 关联日报日期：可空 = 独立问题 */
     private LocalDate reportDate;
 
+    /** 所属项目（可空 = 未分类） */
+    private String project;
+
     /** 多个解决方案（可空）；元素 content 必填，best 标记最佳方案 */
     private List<IssueSolution> solutions;
 

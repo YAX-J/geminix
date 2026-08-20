@@ -42,6 +42,9 @@ public class Report {
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<String> tags;
 
+    /** 所属项目（可空 = 未分类，用于多项目日志归类） */
+    private String project;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
